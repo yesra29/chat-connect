@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "952888872607",
+    "project_id": "chat-connect-b9f01",
+    "storage_bucket": "chat-connect-b9f01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:952888872607:android:0403505f945cd244d75caa",
+        "android_client_info": {
+          "package_name": "com.example.tuneup_task"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChstndHyV_oqBH305sySNre2sEYMXeAIg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
