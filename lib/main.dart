@@ -2,6 +2,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:tuneup_task/pages/login_page.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:tuneup_task/utils.dart';
 
 
 void main() async{
@@ -13,6 +14,7 @@ void main() async{
 Future<void> setupFirebase() async {
   WidgetsFlutterBinding.ensureInitialized();
   await setupFirebase();
+  await registerServices();
 }
 
 class MyApp extends StatelessWidget {

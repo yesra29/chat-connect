@@ -9,6 +9,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+
+  final GlobalKey<FornState> _loginFormKey = GlobalKey();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,6 +29,7 @@ class _LoginPageState extends State<LoginPage> {
           children: [
             _headerText(),
             _loginForm(),
+            _createAccountLink(),
           ],
         ),
       ),
@@ -60,12 +63,59 @@ class _LoginPageState extends State<LoginPage> {
       height: MediaQuery.sizeOf(context).height * 0.40,
       margin: EdgeInsets.symmetric(
           vertical: MediaQuery.sizeOf(context).height * 0.05),
-      child: const Form(
+      child: Form(
+        key: _loginFormKey,
           child: Column(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CustomField(),
+          CustomField(
+            height: MediaQuery.sizeOf(context).height * 0.1,
+            hintText: "Email",
+          ),
+          CustomField(
+              height: MediaQuery.sizeOf(context).height * 0.1,
+              hintText: "Password"),
+          _loginButton(),
         ],
       )),
+
     );
+  }
+
+  Widget _loginButton() {
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width,
+      child: MaterialButton(
+        onPressed: () {
+          if(_loginFormKey.currentState?.validate() ?? false) {
+
+          }
+        },
+        color: Theme.of(context).colorScheme.primary,
+        child: const Text(
+          "Login",
+          style: TextStyle(
+              color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _createAccountLink() {
+    return const Expanded(child: Row(
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          "Don't have an account?",
+        ),
+        Text(
+          "Sign Up?",style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ],
+    ));
   }
 }
