@@ -143,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _createAccountLink() {
-    return  Expanded(
+    return Expanded(
         child: Row(
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,

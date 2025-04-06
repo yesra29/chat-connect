@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 import 'package:tuneup_task/firebase_options.dart';
 import 'package:tuneup_task/services/alert_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
+import 'package:tuneup_task/services/media_service.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
 
 Future<void> setupFirebase() async {
@@ -14,4 +15,5 @@ Future<void> registerServices() async {
   getIt.registerSingleton<AuthService>(AuthService());
   getIt.registerSingleton<NavigationService>(NavigationService());
   getIt.registerSingleton<AlertService>(AlertService());
+  getIt.registerSingleton<MediaService>(MediaService());
 }
