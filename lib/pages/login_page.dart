@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tuneup_task/const.dart';
+import 'package:tuneup_task/services/alert_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
 import 'package:tuneup_task/widgets/custom_field.dart';
@@ -17,6 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final GlobalKey<FormState> _loginFormKey = GlobalKey();
   late AuthService _authService;
   late NavigationService _navigationService;
+  late AlertService _alertService;
   String? email, password;
 
   @override
@@ -24,7 +26,9 @@ class _LoginPageState extends State<LoginPage> {
     super.initState();
     _authService = getIt.get<AuthService>();
     _navigationService = getIt.get<NavigationService>();
+    _alertService = getIt.get<AlertService>();
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,7 +92,7 @@ class _LoginPageState extends State<LoginPage> {
                 height: MediaQuery.sizeOf(context).height * 0.1,
                 hintText: "Email",
                 validationRegEx: EMAIL_VALIDATOR_REGEX,
-                onSaved: (value){
+                onSaved: (value) {
                   setState(() {
                     email = value;
                   });
@@ -99,7 +103,7 @@ class _LoginPageState extends State<LoginPage> {
                 hintText: "Password",
                 validationRegEx: PASSWORD_VALIDATOR_REGEX,
                 obscureText: true,
-                onSaved: (value){
+                onSaved: (value) {
                   setState(() {
                     password = value;
                   });
@@ -115,14 +119,17 @@ class _LoginPageState extends State<LoginPage> {
     return SizedBox(
       width: MediaQuery.sizeOf(context).width,
       child: MaterialButton(
-        onPressed: () async{
+        onPressed: () async {
           if (_loginFormKey.currentState?.validate() ?? false) {
             _loginFormKey.currentState?.save();
             bool result = await _authService.login(email!, password!);
-            if(result) {
-_navigationService.pushReplacementNamed("/home");
-            } else{
-
+            if (result) {
+              _navigationService.pushReplacementNamed("/home");
+            } else {
+              _alertService.showToast(
+                text: "Failed to login, Please try again!",
+                icon: Icons.error,
+              );
             }
           }
         },
@@ -136,18 +143,23 @@ _navigationService.pushReplacementNamed("/home");
   }
 
   Widget _createAccountLink() {
-    return const Expanded(
+    return  Expanded(
         child: Row(
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
+        const Text(
           "Don't have an account?",
         ),
-        Text(
-          "Sign Up?",
-          style: TextStyle(fontWeight: FontWeight.w800),
+        GestureDetector(
+          onTap: () {
+            _navigationService.pushNamed("/register");
+          },
+          child: const Text(
+            "Sign Up?",
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       ],
     ));

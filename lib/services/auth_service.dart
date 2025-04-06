@@ -7,6 +7,7 @@ class AuthService {
   User? get user {
     return _user;
   }
+
   AuthService() {
     _firebaseAuth.authStateChanges().listen(authStateChangesStreamListener);
   }
@@ -25,11 +26,21 @@ class AuthService {
     return false;
   }
 
+  Future<bool> logout() async {
+    try {
+      await _firebaseAuth.signOut();
+      return true;
+    } catch (e) {
+      print(e);
+    }
+    return false;
+  }
+
   void authStateChangesStreamListener(User? user) {
-    if(user !=null) {
-      _user= user;
-    } else{
-      _user =null;
+    if (user != null) {
+      _user = user;
+    } else {
+      _user = null;
     }
   }
 }
