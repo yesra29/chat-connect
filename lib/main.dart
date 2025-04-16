@@ -8,6 +8,10 @@ import 'package:tuneup_task/services/database_services.dart';
 import 'package:tuneup_task/services/media_service.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
+import 'package:tuneup_task/theme/app_theme.dart';
+import 'package:tuneup_task/pages/login_page.dart';
+import 'package:tuneup_task/pages/home_page.dart';
+import 'firebase_options.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -15,7 +19,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     await setupFirebase();
     await registerServices();
     runApp(const MyApp());
@@ -81,14 +87,19 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: _navigationService.navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-        textTheme: GoogleFonts.montserratTextTheme(),
-      ),
+      title: 'TuneUp Chat',
+      theme: AppTheme.lightTheme,
       initialRoute: _authService.user != null ? "/home" : "/login",
-      routes: _navigationService.routes,
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(builder: (_) => LoginPage());
+          case '/home':
+            return MaterialPageRoute(builder: (_) => HomePage());
+          default:
+            return MaterialPageRoute(builder: (_) => LoginPage());
+        }
+      },
     );
   }
 }

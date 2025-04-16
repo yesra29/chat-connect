@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import 'package:tuneup_task/models/user_profile.dart';
-import 'package:tuneup_task/services/alert_service.dart';
-import 'package:tuneup_task/services/auth_service.dart';
-import 'package:tuneup_task/services/database_services.dart';
-import 'package:tuneup_task/services/navigation_service.dart';
-import 'package:tuneup_task/widgets/chat_tile.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/user_profile.dart';
+import '../services/alert_service.dart';
+import '../services/auth_service.dart';
+import '../services/database_services.dart';
+import '../services/navigation_service.dart';
+import '../models/chat.dart' as chat_model;
+import '../models/group.dart';
+import '../utils.dart';
+import 'chat_page.dart';
+import 'group_page.dart';
+import 'create_group_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({Key? key}) : super(key: key);
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -19,7 +25,6 @@ class _HomePageState extends State<HomePage> {
   late AuthService _authService;
   late NavigationService _navigationService;
   late AlertService _alertService;
-  late DatabaseService _databaseService;
 
   @override
   void initState() {
@@ -27,120 +32,108 @@ class _HomePageState extends State<HomePage> {
     _authService = _getIt.get<AuthService>();
     _navigationService = _getIt.get<NavigationService>();
     _alertService = _getIt.get<AlertService>();
-    _databaseService = _getIt.get<DatabaseService>();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          'ROYAL RIDERS',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           IconButton(
-              onPressed: () async {
-                AuthResult result = await _authService.logout();
-                if (result == AuthResult.success) {
-                  _alertService.showToast(
-                      text: "Successfully logged out!", icon: Icons.check);
-                  _navigationService.pushReplacementNamed("/login");
-                } else {
-                  _alertService.showToast(
-                      text: "Failed to logout: ${_getErrorMessage(result)}",
-                      icon: Icons.error);
-                }
-              },
-              icon: const Icon(
-                Icons.logout,
-                color: Colors.red,
-              ))
-        ],
-        title: const Text("Messages"),
-      ),
-      body: _buildUI(),
-    );
-  }
-
-  Widget _buildUI() {
-    return SafeArea(
-        child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 15.0, vertical: 20.0),
-            child: _chatList()));
-  }
-
-  Widget _chatList() {
-    return StreamBuilder<List<UserProfile>>(
-        stream: _databaseService.getUserProfiles(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            print("Error in chat list: ${snapshot.error}");
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                  const SizedBox(height: 16),
-                  Text(
-                    "Unable to load data: ${snapshot.error}",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          if (!snapshot.hasData ||
-              snapshot.data == null ||
-              snapshot.data!.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people_outline, size: 48, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    "No users found",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final users = snapshot.data!;
-          print("Found ${users.length} users");
-
-          return ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (context, index) {
-                final user = users[index];
-                print("User ${index + 1}: ${user.name} (${user.uid})");
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10.0),
-                  child: ChatTile(
-                    userProfile: user,
-                    onTap: () async{
-
-                    },
-                  ),
+            onPressed: () async {
+              AuthResult result = await _authService.logout();
+              if (result == AuthResult.success) {
+                _alertService.showToast(
+                  text: "Successfully logged out!",
+                  icon: Icons.check,
                 );
-              });
-        });
-  }
-
-  String _getErrorMessage(AuthResult result) {
-    switch (result) {
-      case AuthResult.operationNotAllowed:
-        return "Logout is currently disabled";
-      default:
-        return "An unexpected error occurred";
-    }
+                _navigationService.pushReplacementNamed("/login");
+              } else {
+                _alertService.showToast(
+                  text: "Failed to logout",
+                  icon: Icons.error,
+                );
+              }
+            },
+            icon: Icon(Icons.logout, color: Theme.of(context).colorScheme.primary),
+          )
+        ],
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black,
+              Color(0xFF1A1A1A), // Very slightly lighter black
+            ],
+            stops: [0.0, 1.0],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(height: kToolbarHeight + MediaQuery.of(context).padding.top), // Space for AppBar
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Service Mode',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Divider(
+              color: Colors.white24,
+              height: 1,
+            ),
+            Expanded(
+              child: Container(), // Space for future content
+            ),
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black,
+                  ],
+                  stops: [0.0, 1.0],
+                ),
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  // Handle locate stations
+                },
+                child: Text(
+                  'Locate Nearest Stations',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
