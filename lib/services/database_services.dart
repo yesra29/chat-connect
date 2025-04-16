@@ -23,7 +23,7 @@ class DatabaseService {
         .withConverter<UserProfile>(
             fromFirestore: (snapshot, _) =>
                 UserProfile.fromJson(snapshot.data()!),
-            toFirestore: (userProfile, _) => userProfile.toJson());
+        toFirestore: (userProfile, _) => userProfile.toJson());
     
     _chatsCollection = _firebaseFirestore.collection('chats').withConverter<Map<String, dynamic>>(
       fromFirestore: (snapshot, _) => snapshot.data()!,
@@ -95,27 +95,19 @@ class DatabaseService {
             
             final users = snapshot.docs
                 .map((doc) {
-                  print("Processing document: ${doc.id}");
-                  print("Document data: ${doc.data()}");
-                  return doc.data();
+                  final user = doc.data();
+                  print("Processing user: ${user.name} (${user.email}) with UID: ${user.uid}");
+                  return user;
                 })
-                .where((profile) => profile != null)
-                .cast<UserProfile>()
+                .where((user) => user != null && user.uid != currentUser.uid)
                 .toList();
             
-            // Filter out users who don't have an email (not authenticated)
-            final authenticatedUsers = users.where((user) => 
-              user.email != null && 
-              user.email != currentUser.email
-            ).toList();
+            print("Found ${users.length} users after filtering");
+            users.forEach((user) {
+              print("Available user: ${user.name} (${user.email})");
+            });
             
-            print("Total authenticated users found: ${authenticatedUsers.length}");
-            if (authenticatedUsers.isEmpty) {
-              print("No authenticated users found in the database");
-            } else {
-              print("Found authenticated users: ${authenticatedUsers.map((u) => '${u.name} (${u.email})').join(', ')}");
-            }
-            return authenticatedUsers;
+            return users;
           });
     } catch (e, stackTrace) {
       print("Error getting user profiles: $e");
@@ -366,11 +358,31 @@ class DatabaseService {
     }
   }
 
+  // Add method to get user profiles by IDs
+  Future<Map<String, UserProfile>> getUserProfilesByIds(List<String> userIds) async {
+    try {
+      final users = await _usersCollection
+          .where(FieldPath.documentId, whereIn: userIds)
+          .get();
+      
+      final userMap = <String, UserProfile>{};
+      for (var doc in users.docs) {
+        userMap[doc.id] = doc.data();
+      }
+      return userMap;
+    } catch (e) {
+      print("Error getting user profiles by IDs: $e");
+      return {};
+    }
+  }
+
   // Existing chat functionality
   Future<String> getChatId(String uid1, String uid2) {
-    // Make this synchronous since we're just doing string operations
+    // Always sort UIDs to ensure consistent chat ID regardless of who initiates
     final sortedIds = [uid1, uid2]..sort();
-    return Future.value('${sortedIds[0]}_${sortedIds[1]}');
+    final chatId = '${sortedIds[0]}_${sortedIds[1]}';
+    print("Generated chat ID: $chatId for users: $uid1 and $uid2");
+    return Future.value(chatId);
   }
 
   Future<bool> checkChatExists(String uid1, String uid2) async {
@@ -378,8 +390,9 @@ class DatabaseService {
       final chatId = await getChatId(uid1, uid2);
       print("Checking chat existence for ID: $chatId");
       final doc = await _chatsCollection.doc(chatId).get();
-      print("Chat exists: ${doc.exists} for ID: $chatId");
-      return doc.exists;
+      final exists = doc.exists;
+      print("Chat ${exists ? 'exists' : 'does not exist'} for ID: $chatId");
+      return exists;
     } catch (e) {
       print("Error checking chat existence: $e");
       return false;
@@ -434,6 +447,7 @@ class DatabaseService {
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getChatMessages(String chatId) {
     try {
+      print("Getting messages for chat: $chatId");
       return _chatsCollection
           .doc(chatId)
           .collection('messages')
@@ -442,7 +456,11 @@ class DatabaseService {
             toFirestore: (data, _) => data,
           )
           .orderBy('timestamp', descending: true)
-          .snapshots();
+          .snapshots()
+          .map((snapshot) {
+            print("Received ${snapshot.docs.length} messages for chat: $chatId");
+            return snapshot;
+          });
     } catch (e) {
       print("Error getting chat messages: $e");
       return Stream.empty();
@@ -456,6 +474,7 @@ class DatabaseService {
       }
 
       print("Attempting to send message in chat: $chatId");
+      print("Sender ID: $senderId");
 
       // Check if chat exists
       final chatDoc = await _chatsCollection.doc(chatId).get();
@@ -468,8 +487,16 @@ class DatabaseService {
           return DatabaseResult.error("Invalid chat ID format");
         }
 
-        // Create chat first
-        print("Creating chat between ${uids[0]} and ${uids[1]}");
+        // Get user profiles to verify users exist
+        final user1 = await getUserProfile(uids[0]);
+        final user2 = await getUserProfile(uids[1]);
+
+        if (user1 == null || user2 == null) {
+          print("One or both users not found for chat creation");
+          return DatabaseResult.error("One or both users not found");
+        }
+
+        print("Creating chat between ${user1.name} and ${user2.name}");
         await _chatsCollection.doc(chatId).set({
           'participants': uids,
           'createdAt': FieldValue.serverTimestamp(),
@@ -477,22 +504,55 @@ class DatabaseService {
           'lastMessageTime': null,
           'readStatus': {},
         });
+
+        print("Chat document created with ID: $chatId");
+      }
+
+      // Verify the chat document exists and contains both participants
+      final verifyDoc = await _chatsCollection.doc(chatId).get();
+      if (!verifyDoc.exists) {
+        print("Failed to create chat document");
+        return DatabaseResult.error("Failed to create chat");
+      }
+
+      final chatData = verifyDoc.data() as Map<String, dynamic>;
+      final participants = List<String>.from(chatData['participants'] ?? []);
+      
+      // Ensure both users are in the participants list
+      if (!participants.contains(senderId)) {
+        print("Sender is not a participant in this chat");
+        return DatabaseResult.error("Sender is not a participant in this chat");
       }
 
       print("Sending message to chat: $chatId");
-      final messageRef = await _chatsCollection.doc(chatId).collection('messages').add({
+      
+      // Create message data
+      final messageData = {
         'senderId': senderId,
         'message': message,
         'timestamp': FieldValue.serverTimestamp(),
         'readStatus': {senderId: true},
-      });
+        'delivered': true,
+      };
+
+      // Add the message
+      final messageRef = await _chatsCollection
+          .doc(chatId)
+          .collection('messages')
+          .add(messageData);
+
+      print("Message added with ID: ${messageRef.id}");
 
       // Update last message in chat document
-      await _chatsCollection.doc(chatId).update({
+      final chatUpdateData = {
         'lastMessage': message,
         'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageId': messageRef.id,
         'readStatus': {senderId: true},
-      });
+        'lastSenderId': senderId,
+      };
+
+      await _chatsCollection.doc(chatId).update(chatUpdateData);
 
       print("Successfully sent message in chat $chatId");
       return DatabaseResult.success();
@@ -526,7 +586,15 @@ class DatabaseService {
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> getChatStatus(String chatId) {
     try {
-      return _chatsCollection.doc(chatId).snapshots();
+      print("Getting chat status for: $chatId");
+      return _chatsCollection
+          .doc(chatId)
+          .snapshots()
+          .map((snapshot) {
+            print("Received chat status update for: $chatId");
+            print("Chat data: ${snapshot.data()}");
+            return snapshot;
+          });
     } catch (e) {
       print("Error getting chat status: $e");
       return Stream.empty();
