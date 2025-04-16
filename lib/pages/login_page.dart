@@ -122,12 +122,13 @@ class _LoginPageState extends State<LoginPage> {
         onPressed: () async {
           if (_loginFormKey.currentState?.validate() ?? false) {
             _loginFormKey.currentState?.save();
-            bool result = await _authService.login(email!, password!);
-            if (result) {
+            AuthResult result = await _authService.login(email!, password!);
+            if (result == AuthResult.success) {
               _navigationService.pushReplacementNamed("/home");
             } else {
+              String errorMessage = _getErrorMessage(result);
               _alertService.showToast(
-                text: "Failed to login, Please try again!",
+                text: errorMessage,
                 icon: Icons.error,
               );
             }
@@ -140,6 +141,23 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  String _getErrorMessage(AuthResult result) {
+    switch (result) {
+      case AuthResult.invalidEmail:
+        return "Invalid email address";
+      case AuthResult.userDisabled:
+        return "This account has been disabled";
+      case AuthResult.userNotFound:
+        return "No account found with this email";
+      case AuthResult.wrongPassword:
+        return "Incorrect password";
+      case AuthResult.operationNotAllowed:
+        return "This operation is not allowed";
+      default:
+        return "Failed to login, Please try again!";
+    }
   }
 
   Widget _createAccountLink() {

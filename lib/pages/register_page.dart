@@ -1,11 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:tuneup_task/const.dart';
+import 'package:tuneup_task/models/user_profile.dart';
+import 'package:tuneup_task/services/alert_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
-import 'package:tuneup_task/services/media_service.dart';
+import 'package:tuneup_task/services/database_services.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
+import 'package:tuneup_task/utils.dart';
 import 'package:tuneup_task/widgets/custom_field.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -18,19 +19,20 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final GetIt _getIt = GetIt.instance;
   final GlobalKey<FormState> _registerFormKey = GlobalKey();
-  late MediaService _mediaService;
   late AuthService _authService;
   late NavigationService _navigationService;
+  late AlertService _alertService;
+  late DatabaseService _databaseService;
   String? email, password, name;
-  File? selectedImage;
   bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _mediaService = _getIt.get<MediaService>();
+    _alertService = _getIt.get<AlertService>();
     _navigationService = _getIt.get<NavigationService>();
     _authService = _getIt.get<AuthService>();
+    _databaseService = _getIt.get<DatabaseService>();
   }
 
   @override
@@ -45,14 +47,16 @@ class _RegisterPageState extends State<RegisterPage> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 20.0),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _headerText(),
-              if(!isLoading)_registerForm(),
-              if(!isLoading)_loginAccountLink(),
-            if(isLoading)
-              const Expanded(child: Center(child: CircularProgressIndicator(),))]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _headerText(),
+          if (!isLoading) _registerForm(),
+          if (!isLoading) _loginAccountLink(),
+          if (isLoading)
+            const Expanded(
+                child: Center(
+              child: CircularProgressIndicator(),
+            ))
+        ]),
       ),
     );
   }
@@ -91,7 +95,6 @@ class _RegisterPageState extends State<RegisterPage> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _profileSelection(),
               CustomField(
                   hintText: "Name",
                   height: MediaQuery.sizeOf(context).height * 0.1,
@@ -126,50 +129,71 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _profileSelection() {
-    return GestureDetector(
-      onTap: () async {
-        File? file = await _mediaService.getImageFromGallery();
-        if (file != null) {
-          setState(() {
-            selectedImage = file;
-          });
-        }
-      },
-      child: Center(
-        child: CircleAvatar(
-          radius: MediaQuery.of(context).size.width * 0.15,
-          backgroundImage: selectedImage != null
-              ? FileImage(selectedImage!)
-              : const NetworkImage(PLACEHOLDER_PFP) as ImageProvider,
-        ),
-      ),
-    );
-  }
-
   Widget _registerButton() {
     return SizedBox(
       width: MediaQuery.sizeOf(context).width,
       child: MaterialButton(
         color: Theme.of(context).colorScheme.primary,
-        onPressed: () async{
+        onPressed: () async {
           setState(() {
-            isLoading= true;
+            isLoading = true;
           });
           try {
-            if ((_registerFormKey.currentState?.validate() ?? false) && selectedImage != null) {
+            if (_registerFormKey.currentState?.validate() ?? false) {
               _registerFormKey.currentState?.save();
-              bool result = await _authService.signUp(email!, password!);
-              if(result) {
-                print(result);
+              print("Attempting to register user: $email");
+              
+              AuthResult authResult = await _authService.signUp(email!, password!);
+              print("Auth result: $authResult");
+              
+              if (authResult == AuthResult.success) {
+                print("Creating user profile for UID: ${_authService.user!.uid}");
+                
+                // Generate a random avatar URL based on the user's name
+                final avatarUrl = getRandomAvatarUrl(name!);
+                print("Generated avatar URL: $avatarUrl");
+                
+                DatabaseResult dbResult = await _databaseService.createUserProfile(
+                  userProfile: UserProfile(
+                    uid: _authService.user!.uid, 
+                    name: name!, 
+                    pfpURL: avatarUrl
+                  )
+                );
+                
+                print("Database result: ${dbResult.isSuccess}");
+                
+                if (dbResult.isSuccess) {
+                  _alertService.showToast(
+                    text: "User registered successfully!",
+                    icon: Icons.check
+                  );
+                  _navigationService.pushReplacementNamed("/login");
+                } else {
+                  _alertService.showToast(
+                    text: "Failed to create user profile: ${dbResult.error}",
+                    icon: Icons.error
+                  );
+                }
+              } else {
+                String errorMessage = _getErrorMessage(authResult);
+                _alertService.showToast(
+                  text: errorMessage,
+                  icon: Icons.error
+                );
               }
             }
           } catch (e) {
-            print(e);
+            print("Registration error: $e");
+            _alertService.showToast(
+              text: "An unexpected error occurred: $e",
+              icon: Icons.error
+            );
+          } finally {
+            setState(() {
+              isLoading = false;
+            });
           }
-          setState(() {
-            isLoading=false;
-          });
         },
         child: const Text(
           "Register",
@@ -179,6 +203,20 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  String _getErrorMessage(AuthResult result) {
+    switch (result) {
+      case AuthResult.emailAlreadyInUse:
+        return "This email is already registered";
+      case AuthResult.invalidEmail:
+        return "Invalid email address";
+      case AuthResult.weakPassword:
+        return "Password is too weak";
+      case AuthResult.operationNotAllowed:
+        return "Registration is currently disabled";
+      default:
+        return "Failed to register, Please try again!";
+    }
+  }
 
   Widget _loginAccountLink() {
     return Expanded(

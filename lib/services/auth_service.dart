@@ -1,60 +1,93 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
+
 
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   User? _user;
-  User? get user {
-    return _user;
-  }
+  User? get user => _user;
 
   AuthService() {
     _firebaseAuth.authStateChanges().listen(authStateChangesStreamListener);
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<AuthResult> login(String email, String password) async {
     try {
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
           email: email, password: password);
       if (credential.user != null) {
         _user = credential.user;
-        return true;
+        return AuthResult.success;
       }
+      return AuthResult.failure;
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.fromFirebaseException(e);
     } catch (e) {
-      print(e);
+      return AuthResult.unknownError;
     }
-    return false;
   }
 
-  Future<bool> signUp(String email, String password) async {
+  Future<AuthResult> signUp(String email, String password) async {
     try {
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email, password: password);
       if (credential.user != null) {
         _user = credential.user;
-        return true;
+        return AuthResult.success;
       }
+      return AuthResult.failure;
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.fromFirebaseException(e);
     } catch (e) {
-      print(e);
+      return AuthResult.unknownError;
     }
-    return false;
   }
 
-  Future<bool> logout() async {
+  Future<AuthResult> logout() async {
     try {
       await _firebaseAuth.signOut();
-      return true;
+      return AuthResult.success;
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.fromFirebaseException(e);
     } catch (e) {
-      print(e);
+      return AuthResult.unknownError;
     }
-    return false;
   }
 
   void authStateChangesStreamListener(User? user) {
-    if (user != null) {
-      _user = user;
-    } else {
-      _user = null;
+    _user = user;
+  }
+}
+
+enum AuthResult {
+  success,
+  failure,
+  invalidEmail,
+  userDisabled,
+  userNotFound,
+  wrongPassword,
+  emailAlreadyInUse,
+  weakPassword,
+  operationNotAllowed,
+  unknownError;
+
+  static AuthResult fromFirebaseException(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return AuthResult.invalidEmail;
+      case 'user-disabled':
+        return AuthResult.userDisabled;
+      case 'user-not-found':
+        return AuthResult.userNotFound;
+      case 'wrong-password':
+        return AuthResult.wrongPassword;
+      case 'email-already-in-use':
+        return AuthResult.emailAlreadyInUse;
+      case 'weak-password':
+        return AuthResult.weakPassword;
+      case 'operation-not-allowed':
+        return AuthResult.operationNotAllowed;
+      default:
+        return AuthResult.unknownError;
     }
   }
 }

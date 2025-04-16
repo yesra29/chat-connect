@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tuneup_task/services/alert_service.dart';
+import 'package:tuneup_task/services/database_services.dart';
 import 'package:tuneup_task/services/media_service.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
@@ -12,11 +13,49 @@ final GetIt sl = GetIt.instance;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await setupFirebase();
-  await registerServices();
-
-  runApp(MyApp());
+  
+  try {
+    await Firebase.initializeApp();
+    await setupFirebase();
+    await registerServices();
+    runApp(const MyApp());
+  } catch (e) {
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Failed to initialize app',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    e.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> setupFirebase() async {
@@ -28,19 +67,17 @@ Future<void> registerServices() async {
   sl.registerLazySingleton<AuthService>(() => AuthService());
   sl.registerLazySingleton<AlertService>(() => AlertService());
   sl.registerLazySingleton<MediaService>(() => MediaService());
+  sl.registerLazySingleton<DatabaseService>(() => DatabaseService());
 }
 
 class MyApp extends StatelessWidget {
-  final GetIt _getIt = GetIt.instance;
-  late NavigationService _navigationService;
-  late AuthService _authService;
-  MyApp({super.key}) {
-    _navigationService = _getIt.get<NavigationService>();
-    _authService = _getIt.get<AuthService>();
-  }
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final _navigationService = sl.get<NavigationService>();
+    final _authService = sl.get<AuthService>();
+
     return MaterialApp(
       navigatorKey: _navigationService.navigatorKey,
       debugShowCheckedModeBanner: false,
