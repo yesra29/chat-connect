@@ -1,32 +1,37 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum MessageType{Text,Image}
-
-class Message{
-  String? senderID;
-  String? content;
-  MessageType? messageType;
-  Timestamp? sentAt;
+class Message {
+  final String id;
+  final String senderId;
+  final String message;
+  final DateTime timestamp;
 
   Message({
-    required this.senderID,
-    required this.content,
-    required this.messageType,
-    required this.sentAt,
-});
+    required this.id,
+    required this.senderId,
+    required this.message,
+    required this.timestamp,
+  });
 
+  factory Message.fromJson(Map<String, dynamic> json) {
+    return Message(
+      id: json['id'] as String,
+      senderId: json['senderId'] as String,
+      message: json['message'] as String,
+      timestamp: (json['timestamp'] as Timestamp).toDate(),
+    );
+  }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'senderId': senderId,
+      'message': message,
+      'timestamp': Timestamp.fromDate(timestamp),
+    };
+  }
 
-class Message {
-  Message.fromJson(Map<String,dynamic>json) {
-}
-
-Map<String,dynamic> toJson() {
-    final Map<String,dynamic> data = new Map<String,dynamic>();
-    data['senderID'] = senderID;
-    data['content'] = content;
-    data['sentAt'] = sentAt;
-    data['messageType'] = messageType!.name;
-    return data;
-}
+  bool isSentByMe(String currentUserId) {
+    return senderId == currentUserId;
+  }
 }
