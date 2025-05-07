@@ -358,24 +358,6 @@ class DatabaseService {
     }
   }
 
-  // Add method to get user profiles by IDs
-  Future<Map<String, UserProfile>> getUserProfilesByIds(List<String> userIds) async {
-    try {
-      final users = await _usersCollection
-          .where(FieldPath.documentId, whereIn: userIds)
-          .get();
-      
-      final userMap = <String, UserProfile>{};
-      for (var doc in users.docs) {
-        userMap[doc.id] = doc.data();
-      }
-      return userMap;
-    } catch (e) {
-      print("Error getting user profiles by IDs: $e");
-      return {};
-    }
-  }
-
   // Existing chat functionality
   Future<String> getChatId(String uid1, String uid2) {
     // Always sort UIDs to ensure consistent chat ID regardless of who initiates
@@ -451,14 +433,16 @@ class DatabaseService {
       return _chatsCollection
           .doc(chatId)
           .collection('messages')
-          .withConverter<Map<String, dynamic>>(
-            fromFirestore: (snapshot, _) => snapshot.data()!,
-            toFirestore: (data, _) => data,
-          )
           .orderBy('timestamp', descending: true)
           .snapshots()
           .map((snapshot) {
-            print("Received ${snapshot.docs.length} messages for chat: $chatId");
+            print("Received ${snapshot.docs.length} messages");
+            snapshot.docs.forEach((doc) {
+              final data = doc.data();
+              print("Message data: ${data.toString()}");
+              print("Is media: ${data['isMedia']}");
+              print("Message content: ${data['message']}");
+            });
             return snapshot;
           });
     } catch (e) {
@@ -467,94 +451,47 @@ class DatabaseService {
     }
   }
 
-  Future<DatabaseResult> sendMessage(String chatId, String senderId, String message) async {
+  Future<DatabaseResult> sendMessage(
+    String chatId,
+    String senderId,
+    String message, {
+    bool isMedia = false,
+  }) async {
     try {
-      if (message.trim().isEmpty) {
-        return DatabaseResult.error("Message cannot be empty");
-      }
-
-      print("Attempting to send message in chat: $chatId");
-      print("Sender ID: $senderId");
-
-      // Check if chat exists
-      final chatDoc = await _chatsCollection.doc(chatId).get();
-      if (!chatDoc.exists) {
-        print("Chat does not exist, creating new chat...");
-        // Extract UIDs from chatId (format: "uid1_uid2")
-        final uids = chatId.split('_');
-        if (uids.length != 2) {
-          print("Invalid chat ID format: $chatId");
-          return DatabaseResult.error("Invalid chat ID format");
-        }
-
-        // Get user profiles to verify users exist
-        final user1 = await getUserProfile(uids[0]);
-        final user2 = await getUserProfile(uids[1]);
-
-        if (user1 == null || user2 == null) {
-          print("One or both users not found for chat creation");
-          return DatabaseResult.error("One or both users not found");
-        }
-
-        print("Creating chat between ${user1.name} and ${user2.name}");
-        await _chatsCollection.doc(chatId).set({
-          'participants': uids,
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastMessage': null,
-          'lastMessageTime': null,
-          'readStatus': {},
-        });
-
-        print("Chat document created with ID: $chatId");
-      }
-
-      // Verify the chat document exists and contains both participants
-      final verifyDoc = await _chatsCollection.doc(chatId).get();
-      if (!verifyDoc.exists) {
-        print("Failed to create chat document");
-        return DatabaseResult.error("Failed to create chat");
-      }
-
-      final chatData = verifyDoc.data() as Map<String, dynamic>;
-      final participants = List<String>.from(chatData['participants'] ?? []);
-      
-      // Ensure both users are in the participants list
-      if (!participants.contains(senderId)) {
-        print("Sender is not a participant in this chat");
-        return DatabaseResult.error("Sender is not a participant in this chat");
-      }
-
       print("Sending message to chat: $chatId");
-      
-      // Create message data
+      print("Message type: ${isMedia ? 'Media' : 'Text'}");
+      print("Message content: $message");
+
       final messageData = {
         'senderId': senderId,
         'message': message,
         'timestamp': FieldValue.serverTimestamp(),
-        'readStatus': {senderId: true},
-        'delivered': true,
+        'isMedia': isMedia,
+        'readStatus': {
+          senderId: true,
+        },
       };
 
-      // Add the message
-      final messageRef = await _chatsCollection
+      // Add message to messages subcollection
+      final messageRef = await _firebaseFirestore
+          .collection('chats')
           .doc(chatId)
           .collection('messages')
           .add(messageData);
 
       print("Message added with ID: ${messageRef.id}");
 
-      // Update last message in chat document
-      final chatUpdateData = {
-        'lastMessage': message,
+      // Update chat document
+      await _firebaseFirestore.collection('chats').doc(chatId).update({
+        'lastMessage': isMedia ? '📷 Image' : message,
         'lastMessageTime': FieldValue.serverTimestamp(),
-        'lastMessageId': messageRef.id,
-        'readStatus': {senderId: true},
         'lastSenderId': senderId,
-      };
+        'readStatus': {
+          senderId: true,
+        },
+      });
 
-      await _chatsCollection.doc(chatId).update(chatUpdateData);
-
-      print("Successfully sent message in chat $chatId");
+      print("Chat document updated successfully");
       return DatabaseResult.success();
     } catch (e) {
       print("Error sending message: $e");
@@ -584,21 +521,105 @@ class DatabaseService {
     }
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> getChatStatus(String chatId) {
+  Future<DatabaseResult> updateTypingStatus(String chatId, String userId, bool isTyping) async {
     try {
-      print("Getting chat status for: $chatId");
-      return _chatsCollection
-          .doc(chatId)
-          .snapshots()
-          .map((snapshot) {
-            print("Received chat status update for: $chatId");
-            print("Chat data: ${snapshot.data()}");
-            return snapshot;
-          });
+      await _chatsCollection.doc(chatId).update({
+        'typingStatus.$userId': isTyping,
+      });
+      return DatabaseResult.success();
     } catch (e) {
-      print("Error getting chat status: $e");
-      return Stream.empty();
+      print("Error updating typing status: $e");
+      return DatabaseResult.error(e.toString());
     }
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getChatStatus(String chatId) {
+    return _chatsCollection.doc(chatId).snapshots();
+  }
+
+  Future<void> updateGroupTypingStatus(String groupId, String userId, bool isTyping) async {
+    try {
+      await _groupsCollection.doc(groupId).update({
+        'typingStatus.$userId': isTyping,
+      });
+    } catch (e) {
+      print("Error updating group typing status: $e");
+    }
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> getUserChats() {
+    return _firebaseFirestore
+        .collection('chats')
+        .where('participants', arrayContains: _authService.user!.uid)
+        .snapshots();
+  }
+
+  Future<void> blockUser(String currentUserId, String blockedUserId) async {
+    try {
+      // Add to blocked users collection
+      await _firebaseFirestore.collection('users').doc(currentUserId).collection('blocked_users').doc(blockedUserId).set({
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // Delete the chat if it exists
+      final chatQuery = await _firebaseFirestore
+          .collection('chats')
+          .where('participants', arrayContains: currentUserId)
+          .get();
+
+      for (var doc in chatQuery.docs) {
+        final participants = List<String>.from(doc.data()['participants'] ?? []);
+        if (participants.contains(blockedUserId)) {
+          await doc.reference.delete();
+          break;
+        }
+      }
+    } catch (e) {
+      print('Error blocking user: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> clearChat(String chatId) async {
+    try {
+      // Get all messages in the chat
+      final messagesQuery = await _firebaseFirestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .get();
+
+      // Delete all messages
+      final batch = _firebaseFirestore.batch();
+      for (var doc in messagesQuery.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Update chat metadata
+      batch.update(_firebaseFirestore.collection('chats').doc(chatId), {
+        'lastMessage': null,
+        'lastMessageTime': null,
+        'lastSenderId': null,
+      });
+
+      await batch.commit();
+    } catch (e) {
+      print('Error clearing chat: $e');
+      rethrow;
+    }
+  }
+
+  Stream<List<Map<String, dynamic>>> searchInChat(String chatId, String query) {
+    return _firebaseFirestore
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .where('message', isGreaterThanOrEqualTo: query)
+        .where('message', isLessThanOrEqualTo: query + '\uf8ff')
+        .orderBy('message')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 }
 

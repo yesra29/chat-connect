@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,10 +25,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
@@ -49,20 +43,40 @@ class DefaultFirebaseOptions {
     }
   }
 
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'YOUR-WEB-API-KEY',
+    appId: 'YOUR-WEB-APP-ID',
+    messagingSenderId: 'YOUR-SENDER-ID',
+    projectId: 'YOUR-PROJECT-ID',
+    authDomain: 'YOUR-AUTH-DOMAIN',
+    storageBucket: 'YOUR-STORAGE-BUCKET',
+  );
+
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyChstndHyV_oqBH305sySNre2sEYMXeAIg',
-    appId: '1:952888872607:android:0403505f945cd244d75caa',
-    messagingSenderId: '952888872607',
-    projectId: 'chat-connect-b9f01',
-    storageBucket: 'chat-connect-b9f01.firebasestorage.app',
+    apiKey: 'YOUR-ANDROID-API-KEY',
+    appId: 'YOUR-ANDROID-APP-ID',
+    messagingSenderId: 'YOUR-SENDER-ID',
+    projectId: 'YOUR-PROJECT-ID',
+    storageBucket: 'YOUR-STORAGE-BUCKET',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCLdD8IKs5VIMRb9uPfUUW09Zwc4R_NAd4',
-    appId: '1:952888872607:ios:76fac11f7f7f44ebd75caa',
-    messagingSenderId: '952888872607',
-    projectId: 'chat-connect-b9f01',
-    storageBucket: 'chat-connect-b9f01.firebasestorage.app',
-    iosBundleId: 'com.example.tuneupTask',
+    apiKey: 'YOUR-IOS-API-KEY',
+    appId: 'YOUR-IOS-APP-ID',
+    messagingSenderId: 'YOUR-SENDER-ID',
+    projectId: 'YOUR-PROJECT-ID',
+    storageBucket: 'YOUR-STORAGE-BUCKET',
+    iosClientId: 'YOUR-IOS-CLIENT-ID',
+    iosBundleId: 'YOUR-IOS-BUNDLE-ID',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'YOUR-MACOS-API-KEY',
+    appId: 'YOUR-MACOS-APP-ID',
+    messagingSenderId: 'YOUR-SENDER-ID',
+    projectId: 'YOUR-PROJECT-ID',
+    storageBucket: 'YOUR-STORAGE-BUCKET',
+    iosClientId: 'YOUR-MACOS-CLIENT-ID',
+    iosBundleId: 'YOUR-MACOS-BUNDLE-ID',
   );
 }
