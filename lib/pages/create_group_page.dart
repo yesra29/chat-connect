@@ -16,12 +16,10 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   final GetIt _getIt = GetIt.instance;
   late DatabaseService _databaseService;
   late AlertService _alertService;
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final List<String> _selectedUsers = [];
-  List<UserProfile> _availableUsers = [];
-  bool _isLoading = false;
-  StreamSubscription? _usersSubscription;
+  final TextEditingController _groupNameController = TextEditingController();
+  List<UserProfile> _selectedUsers = [];
+  List<UserProfile> _allUsers = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -32,51 +30,81 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   }
 
   Future<void> _loadUsers() async {
-    if (!mounted) return;
-    
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      // Cancel any existing subscription
-      await _usersSubscription?.cancel();
-      
-      // Get users from the chat list
-      final usersStream = _databaseService.getUserProfiles();
-      _usersSubscription = usersStream.listen(
-        (users) {
-          if (!mounted) return;
-          setState(() {
-            _availableUsers = users;
-            _isLoading = false;
-          });
-        },
-        onError: (error) {
-          if (!mounted) return;
-          setState(() {
-            _isLoading = false;
-          });
-          _alertService.showToast(
-            text: "Error loading users: $error",
-            icon: Icons.error,
-          );
-        },
-      );
+      final users = await _databaseService.getUserProfiles().first;
+      setState(() {
+        _allUsers = users;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       _alertService.showToast(
-        text: "Error loading users: $e",
+        text: "Error loading users",
         icon: Icons.error,
       );
     }
   }
 
+  void _showUserSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Users'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _allUsers.length,
+                  itemBuilder: (context, index) {
+                    final user = _allUsers[index];
+                    final isSelected = _selectedUsers.contains(user);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedUsers.add(user);
+                          } else {
+                            _selectedUsers.remove(user);
+                          }
+                        });
+                      },
+                      title: Text(user.name ?? 'Unknown User'),
+                      subtitle: Text(user.email ?? ''),
+                      secondary: CircleAvatar(
+                        backgroundImage: user.pfpURL != null
+                            ? NetworkImage(user.pfpURL!)
+                            : null,
+                        child: user.pfpURL == null
+                            ? Text(user.name?[0].toUpperCase() ?? 'U')
+                            : null,
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _createGroup() async {
-    if (_nameController.text.isEmpty) {
+    if (_groupNameController.text.isEmpty) {
       _alertService.showToast(
         text: "Please enter a group name",
         icon: Icons.error,
@@ -86,49 +114,36 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
 
     if (_selectedUsers.isEmpty) {
       _alertService.showToast(
-        text: "Please select at least one participant",
+        text: "Please select at least one user",
         icon: Icons.error,
       );
       return;
     }
 
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
       final result = await _databaseService.createGroup(
-        name: _nameController.text,
-        description: _descriptionController.text,
-        participants: _selectedUsers,
+        name: _groupNameController.text,
+        description: '',  // Optional description
+        participants: _selectedUsers.map((user) => user.uid).toList(),
       );
 
-      if (!mounted) return;
-      
       if (result.isSuccess) {
         _alertService.showToast(
-          text: "Group created successfully!",
+          text: "Group created successfully",
           icon: Icons.check,
         );
         Navigator.pop(context);
       } else {
         _alertService.showToast(
-          text: "Error creating group: ${result.error}",
+          text: "Failed to create group: ${result.error}",
           icon: Icons.error,
         );
       }
     } catch (e) {
-      if (!mounted) return;
       _alertService.showToast(
-        text: "Error creating group: $e",
+        text: "Error creating group",
         icon: Icons.error,
       );
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -136,98 +151,118 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Group'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Group Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description (Optional)',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Select Participants',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _availableUsers.isEmpty
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.people_outline, size: 48, color: Colors.grey),
-                                SizedBox(height: 16),
-                                Text(
-                                  "No users available",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  "Start chatting with users first",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _availableUsers.length,
-                            itemBuilder: (context, index) {
-                              final user = _availableUsers[index];
-                              return CheckboxListTile(
-                                title: Text(user.name),
-                                subtitle: Text(user.email ?? ''),
-                                value: _selectedUsers.contains(user.uid),
-                                onChanged: (bool? value) {
-                                  if (!mounted) return;
-                                  setState(() {
-                                    if (value == true) {
-                                      _selectedUsers.add(user.uid);
-                                    } else {
-                                      _selectedUsers.remove(user.uid);
-                                    }
-                                  });
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _createGroup,
-                    child: const Text('Create Group'),
-                  ),
-                ],
+        backgroundColor: const Color(0XFFA65B17),
+        title: const Text('New Group', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _selectedUsers.isEmpty ? null : _createGroup,
+            child: Text(
+              'Create',
+              style: TextStyle(
+                color: _selectedUsers.isEmpty ? Colors.white54 : Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.grey[200],
+                  child: const Icon(Icons.camera_alt, color: Colors.grey),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextField(
+                    controller: _groupNameController,
+                    decoration: const InputDecoration(
+                      hintText: 'Group name',
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                const Icon(Icons.people, color: Colors.grey),
+                const SizedBox(width: 16),
+                Text(
+                  '${_selectedUsers.length} participants',
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: StreamBuilder<List<UserProfile>>(
+              stream: _databaseService.getUserProfiles(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final users = snapshot.data!;
+                return ListView.builder(
+                  itemCount: users.length,
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    final isSelected = _selectedUsers.contains(user);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedUsers.add(user);
+                          } else {
+                            _selectedUsers.remove(user);
+                          }
+                        });
+                      },
+                      title: Text(user.name ?? 'Unknown User'),
+                      subtitle: Text(user.email ?? ''),
+                      secondary: CircleAvatar(
+                        backgroundImage: user.pfpURL != null
+                            ? NetworkImage(user.pfpURL!)
+                            : null,
+                        child: user.pfpURL == null
+                            ? Text(user.name?[0].toUpperCase() ?? 'U')
+                            : null,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _usersSubscription?.cancel();
+    _groupNameController.dispose();
     super.dispose();
   }
 } 

@@ -8,59 +8,55 @@ import 'package:tuneup_task/services/database_services.dart';
 import 'package:tuneup_task/services/media_service.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
-import 'package:tuneup_task/theme/app_theme.dart';
-import 'package:tuneup_task/pages/login_page.dart';
-import 'package:tuneup_task/pages/home_page.dart';
-import 'firebase_options.dart';
+import 'package:tuneup_task/firebase_options.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 final GetIt sl = GetIt.instance;
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize Firebase first
+  print("Initializing Firebase...");
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    print("Firebase initialized successfully");
+
+    // Initialize Firebase Storage
+    final storage = FirebaseStorage.instance;
+    storage.setMaxUploadRetryTime(const Duration(seconds: 3));
+    storage.setMaxOperationRetryTime(const Duration(seconds: 3));
+    
+    // Test storage connection
+    try {
+      final ref = storage.ref();
+      print("Storage bucket: ${ref.bucket}");
+      print("Storage initialized successfully");
+    } catch (e) {
+      print("Error initializing storage: $e");
+    }
+
+    print("Setting up Firebase...");
     await setupFirebase();
-    await registerServices();
+    print("Firebase setup completed");
+
+    // Register services after Firebase is initialized
+    print("Registering services...");
+    sl.registerSingleton<NavigationService>(NavigationService());
+    sl.registerSingleton<AlertService>(AlertService());
+    sl.registerSingleton<AuthService>(AuthService());
+    sl.registerSingleton<MediaService>(MediaService());
+    sl.registerSingleton<DatabaseService>(DatabaseService());
+    print("All services registered successfully");
+
     runApp(const MyApp());
-  } catch (e) {
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: Colors.red,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Failed to initialize app',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    e.toString(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  } catch (e, stackTrace) {
+    print("Error during initialization: $e");
+    print("Stack trace: $stackTrace");
+    _showErrorUI();
   }
 }
 
@@ -68,12 +64,30 @@ Future<void> setupFirebase() async {
   await FirebaseAnalytics.instance.logEvent(name: "app_started");
 }
 
-Future<void> registerServices() async {
-  sl.registerLazySingleton<NavigationService>(() => NavigationService());
-  sl.registerLazySingleton<AuthService>(() => AuthService());
-  sl.registerLazySingleton<AlertService>(() => AlertService());
-  sl.registerLazySingleton<MediaService>(() => MediaService());
-  sl.registerLazySingleton<DatabaseService>(() => DatabaseService());
+void _showErrorUI() {
+  runApp(MaterialApp(
+    navigatorKey: navigatorKey,
+    home: Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text(
+              "Failed to initialize app",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Please restart the app",
+              style: TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -87,19 +101,14 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: _navigationService.navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'TuneUp Chat',
-      theme: AppTheme.lightTheme,
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+        textTheme: GoogleFonts.montserratTextTheme(),
+      ),
       initialRoute: _authService.user != null ? "/home" : "/login",
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case '/login':
-            return MaterialPageRoute(builder: (_) => LoginPage());
-          case '/home':
-            return MaterialPageRoute(builder: (_) => HomePage());
-          default:
-            return MaterialPageRoute(builder: (_) => LoginPage());
-        }
-      },
+      routes: _navigationService.routes,
     );
   }
 }

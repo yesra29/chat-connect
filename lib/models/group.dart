@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:tuneup_task/models/user_profile.dart';
 
 class Group {
   final String id;

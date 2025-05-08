@@ -8,10 +8,13 @@ class AuthService {
 
   AuthService() {
     _firebaseAuth.authStateChanges().listen(authStateChangesStreamListener);
+    _user = _firebaseAuth.currentUser;
   }
 
   Future<AuthResult> login(String email, String password) async {
     try {
+      await _firebaseAuth.setPersistence(Persistence.LOCAL);
+      
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
           email: email, password: password);
       if (credential.user != null) {
@@ -28,6 +31,8 @@ class AuthService {
 
   Future<AuthResult> signUp(String email, String password) async {
     try {
+      await _firebaseAuth.setPersistence(Persistence.LOCAL);
+      
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email, password: password);
       if (credential.user != null) {
@@ -45,6 +50,7 @@ class AuthService {
   Future<AuthResult> logout() async {
     try {
       await _firebaseAuth.signOut();
+      _user = null;
       return AuthResult.success;
     } on FirebaseAuthException catch (e) {
       return AuthResult.fromFirebaseException(e);
