@@ -323,8 +323,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         children: [
                           Text(group.name),
                           if (!isRead) ...[
-                            SizedBox(width: 8),
-                            Icon(Icons.circle, size: 8, color: Colors.blue),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.circle, size: 8, color: Colors.blue),
                           ],
                         ],
                       ),
@@ -336,7 +336,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       trailing: group.lastMessageTime != null
                           ? Text(
                               formatTimestamp(group.lastMessageTime!),
-                              style: TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: 12),
                             )
                           : null,
                       onTap: () {
@@ -527,7 +527,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => CreateGroupPage(),
+                      builder: (context) => const CreateGroupPage(),
                     ),
                   );
                 },
