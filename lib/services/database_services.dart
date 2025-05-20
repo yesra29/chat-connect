@@ -23,17 +23,21 @@ class DatabaseService {
         .withConverter<UserProfile>(
             fromFirestore: (snapshot, _) =>
                 UserProfile.fromJson(snapshot.data()!),
-        toFirestore: (userProfile, _) => userProfile.toJson());
-    
-    _chatsCollection = _firebaseFirestore.collection('chats').withConverter<Map<String, dynamic>>(
-      fromFirestore: (snapshot, _) => snapshot.data()!,
-      toFirestore: (data, _) => data,
-    );
+            toFirestore: (userProfile, _) => userProfile.toJson());
 
-    _groupsCollection = _firebaseFirestore.collection('groups').withConverter<Map<String, dynamic>>(
-      fromFirestore: (snapshot, _) => snapshot.data()!,
-      toFirestore: (data, _) => data,
-    );
+    _chatsCollection = _firebaseFirestore
+        .collection('chats')
+        .withConverter<Map<String, dynamic>>(
+          fromFirestore: (snapshot, _) => snapshot.data()!,
+          toFirestore: (data, _) => data,
+        );
+
+    _groupsCollection = _firebaseFirestore
+        .collection('groups')
+        .withConverter<Map<String, dynamic>>(
+          fromFirestore: (snapshot, _) => snapshot.data()!,
+          toFirestore: (data, _) => data,
+        );
   }
 
   Future<DatabaseResult> createUserProfile(
@@ -42,7 +46,7 @@ class DatabaseService {
       if (userProfile.uid.isEmpty) {
         return DatabaseResult.error("User ID cannot be empty");
       }
-      
+
       if (userProfile.name.isEmpty) {
         return DatabaseResult.error("Name cannot be empty");
       }
@@ -64,13 +68,10 @@ class DatabaseService {
       }
 
       await _usersCollection.doc(userProfile.uid).set(userProfile);
-      print("Successfully created user profile for ${userProfile.name}");
       return DatabaseResult.success();
     } on FirebaseException catch (e) {
-      print("Firebase error creating user profile: ${e.message}");
       return DatabaseResult.error(e.message ?? 'Unknown Firebase error');
     } catch (e) {
-      print("Unexpected error creating user profile: $e");
       return DatabaseResult.error(e.toString());
     }
   }
@@ -78,40 +79,28 @@ class DatabaseService {
   Stream<List<UserProfile>> getUserProfiles() {
     try {
       if (_authService.user == null) {
-        print("No current user found");
         return Stream.value([]);
       }
-      
+
       final currentUser = _authService.user!;
-      print("Current user UID: ${currentUser.uid}");
-      print("Current user email: ${currentUser.email}");
-      
+
       return _usersCollection
           .where("uid", isNotEqualTo: currentUser.uid)
           .snapshots()
           .map((snapshot) {
-            print("Firestore snapshot received");
-            print("Snapshot size: ${snapshot.docs.length}");
-            
-            final users = snapshot.docs
-                .map((doc) {
-                  final user = doc.data();
-                  print("Processing user: ${user.name} (${user.email}) with UID: ${user.uid}");
-                  return user;
-                })
-                .where((user) => user != null && user.uid != currentUser.uid)
-                .toList();
-            
-            print("Found ${users.length} users after filtering");
-            users.forEach((user) {
-              print("Available user: ${user.name} (${user.email})");
-            });
-            
-            return users;
-          });
-    } catch (e, stackTrace) {
-      print("Error getting user profiles: $e");
-      print("Stack trace: $stackTrace");
+        final users = snapshot.docs
+            .map((doc) {
+              final user = doc.data();
+              return user;
+            })
+            .where((user) => user.uid != currentUser.uid)
+            .toList();
+
+        users.forEach((user) {});
+
+        return users;
+      });
+    } catch (e) {
       return Stream.value([]);
     }
   }
@@ -131,13 +120,10 @@ class DatabaseService {
       }
 
       await _usersCollection.doc(uid).update(updates);
-      print("Successfully updated user profile for $uid");
       return DatabaseResult.success();
     } on FirebaseException catch (e) {
-      print("Firebase error updating user profile: ${e.message}");
       return DatabaseResult.error(e.message ?? 'Unknown Firebase error');
     } catch (e) {
-      print("Unexpected error updating user profile: $e");
       return DatabaseResult.error(e.toString());
     }
   }
@@ -145,24 +131,20 @@ class DatabaseService {
   Future<UserProfile?> getUserProfile(String uid) async {
     try {
       if (uid.isEmpty) {
-        print("Empty UID provided");
         return null;
       }
 
       final doc = await _usersCollection.doc(uid).get();
       if (!doc.exists) {
-        print("User document not found for UID: $uid");
         return null;
       }
 
       return doc.data();
     } catch (e) {
-      print("Error getting user profile: $e");
       return null;
     }
   }
 
-  // Group functionality
   Future<DatabaseResult> createGroup({
     required String name,
     required String description,
@@ -175,7 +157,8 @@ class DatabaseService {
       }
 
       if (participants.length > 20) {
-        return DatabaseResult.error("Group cannot have more than 20 participants");
+        return DatabaseResult.error(
+            "Group cannot have more than 20 participants");
       }
 
       final currentUser = _authService.user;
@@ -197,7 +180,6 @@ class DatabaseService {
       await _groupsCollection.doc(groupId).set(group.toJson());
       return DatabaseResult.success();
     } catch (e) {
-      print("Error creating group: $e");
       return DatabaseResult.error(e.toString());
     }
   }
@@ -206,19 +188,19 @@ class DatabaseService {
     try {
       final currentUser = _authService.user;
       if (currentUser == null) {
-        return Stream.empty();
+        return const Stream.empty();
       }
 
       return _groupsCollection
           .where('participants', arrayContains: currentUser.uid)
           .snapshots();
     } catch (e) {
-      print("Error getting user groups: $e");
-      return Stream.empty();
+      return const Stream.empty();
     }
   }
 
-  Future<DatabaseResult> addGroupParticipants(String groupId, List<String> userIds) async {
+  Future<DatabaseResult> addGroupParticipants(
+      String groupId, List<String> userIds) async {
     try {
       final groupDoc = await _groupsCollection.doc(groupId).get();
       if (!groupDoc.exists) {
@@ -227,7 +209,8 @@ class DatabaseService {
 
       final group = Group.fromJson(groupDoc.data()!);
       if (group.participants.length + userIds.length > 20) {
-        return DatabaseResult.error("Group cannot have more than 20 participants");
+        return DatabaseResult.error(
+            "Group cannot have more than 20 participants");
       }
 
       await _groupsCollection.doc(groupId).update({
@@ -236,12 +219,12 @@ class DatabaseService {
 
       return DatabaseResult.success();
     } catch (e) {
-      print("Error adding group participants: $e");
       return DatabaseResult.error(e.toString());
     }
   }
 
-  Future<DatabaseResult> removeGroupParticipants(String groupId, List<String> userIds) async {
+  Future<DatabaseResult> removeGroupParticipants(
+      String groupId, List<String> userIds) async {
     try {
       final groupDoc = await _groupsCollection.doc(groupId).get();
       if (!groupDoc.exists) {
@@ -258,7 +241,6 @@ class DatabaseService {
         return DatabaseResult.error("Only group admin can remove participants");
       }
     } catch (e) {
-      print("Error removing group participants: $e");
       return DatabaseResult.error(e.toString());
     }
   }
@@ -275,12 +257,12 @@ class DatabaseService {
           .orderBy('timestamp', descending: true)
           .snapshots();
     } catch (e) {
-      print("Error getting group messages: $e");
-      return Stream.empty();
+      return const Stream.empty();
     }
   }
 
-  Future<DatabaseResult> sendGroupMessage(String groupId, String message) async {
+  Future<DatabaseResult> sendGroupMessage(
+      String groupId, String message) async {
     try {
       final currentUser = _authService.user;
       if (currentUser == null) {
@@ -301,7 +283,8 @@ class DatabaseService {
         return DatabaseResult.error("User is not a participant of this group");
       }
 
-      final messageRef = await _groupsCollection.doc(groupId).collection('messages').add({
+      final messageRef =
+          await _groupsCollection.doc(groupId).collection('messages').add({
         'senderId': currentUser.uid,
         'message': message,
         'timestamp': FieldValue.serverTimestamp(),
@@ -317,12 +300,12 @@ class DatabaseService {
 
       return DatabaseResult.success();
     } catch (e) {
-      print("Error sending group message: $e");
       return DatabaseResult.error(e.toString());
     }
   }
 
-  Future<DatabaseResult> markGroupMessageAsRead(String groupId, String messageId) async {
+  Future<DatabaseResult> markGroupMessageAsRead(
+      String groupId, String messageId) async {
     try {
       final currentUser = _authService.user;
       if (currentUser == null) {
@@ -344,39 +327,33 @@ class DatabaseService {
 
       return DatabaseResult.success();
     } catch (e) {
-      print("Error marking group message as read: $e");
       return DatabaseResult.error(e.toString());
     }
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> getGroupStatus(String groupId) {
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getGroupStatus(
+      String groupId) {
     try {
       return _groupsCollection.doc(groupId).snapshots();
     } catch (e) {
-      print("Error getting group status: $e");
-      return Stream.empty();
+      return const Stream.empty();
     }
   }
 
-  // Existing chat functionality
   Future<String> getChatId(String uid1, String uid2) {
     // Always sort UIDs to ensure consistent chat ID regardless of who initiates
     final sortedIds = [uid1, uid2]..sort();
     final chatId = '${sortedIds[0]}_${sortedIds[1]}';
-    print("Generated chat ID: $chatId for users: $uid1 and $uid2");
     return Future.value(chatId);
   }
 
   Future<bool> checkChatExists(String uid1, String uid2) async {
     try {
       final chatId = await getChatId(uid1, uid2);
-      print("Checking chat existence for ID: $chatId");
       final doc = await _chatsCollection.doc(chatId).get();
       final exists = doc.exists;
-      print("Chat ${exists ? 'exists' : 'does not exist'} for ID: $chatId");
       return exists;
     } catch (e) {
-      print("Error checking chat existence: $e");
       return false;
     }
   }
@@ -401,16 +378,13 @@ class DatabaseService {
       }
 
       final chatId = await getChatId(uid1, uid2);
-      print("Generated chat ID: $chatId");
-      
+
       // Check if chat already exists
       final chatExists = await checkChatExists(uid1, uid2);
       if (chatExists) {
-        print("Chat already exists with ID: $chatId");
-        return DatabaseResult.success(); // Return success if chat already exists
+        return DatabaseResult.success();
       }
 
-      print("Creating new chat with ID: $chatId");
       await _chatsCollection.doc(chatId).set({
         'participants': [uid1, uid2],
         'createdAt': FieldValue.serverTimestamp(),
@@ -419,35 +393,27 @@ class DatabaseService {
         'readStatus': {},
       });
 
-      print("Successfully created chat between ${user1.name} and ${user2.name}");
       return DatabaseResult.success();
     } catch (e) {
-      print("Error creating chat: $e");
       return DatabaseResult.error(e.toString());
     }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getChatMessages(String chatId) {
     try {
-      print("Getting messages for chat: $chatId");
       return _chatsCollection
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
           .snapshots()
           .map((snapshot) {
-            print("Received ${snapshot.docs.length} messages");
-            snapshot.docs.forEach((doc) {
-              final data = doc.data();
-              print("Message data: ${data.toString()}");
-              print("Is media: ${data['isMedia']}");
-              print("Message content: ${data['message']}");
-            });
-            return snapshot;
-          });
+        snapshot.docs.forEach((doc) {
+          final data = doc.data();
+        });
+        return snapshot;
+      });
     } catch (e) {
-      print("Error getting chat messages: $e");
-      return Stream.empty();
+      return const Stream.empty();
     }
   }
 
@@ -458,10 +424,6 @@ class DatabaseService {
     bool isMedia = false,
   }) async {
     try {
-      print("Sending message to chat: $chatId");
-      print("Message type: ${isMedia ? 'Media' : 'Text'}");
-      print("Message content: $message");
-
       final messageData = {
         'senderId': senderId,
         'message': message,
@@ -472,16 +434,12 @@ class DatabaseService {
         },
       };
 
-      // Add message to messages subcollection
       final messageRef = await _firebaseFirestore
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .add(messageData);
 
-      print("Message added with ID: ${messageRef.id}");
-
-      // Update chat document
       await _firebaseFirestore.collection('chats').doc(chatId).update({
         'lastMessage': isMedia ? '📷 Image' : message,
         'lastMessageTime': FieldValue.serverTimestamp(),
@@ -491,15 +449,14 @@ class DatabaseService {
         },
       });
 
-      print("Chat document updated successfully");
       return DatabaseResult.success();
     } catch (e) {
-      print("Error sending message: $e");
       return DatabaseResult.error(e.toString());
     }
   }
 
-  Future<DatabaseResult> markMessageAsRead(String chatId, String messageId, String userId) async {
+  Future<DatabaseResult> markMessageAsRead(
+      String chatId, String messageId, String userId) async {
     try {
       await _chatsCollection
           .doc(chatId)
@@ -509,26 +466,24 @@ class DatabaseService {
         'readStatus.$userId': true,
       });
 
-      // Also update chat read status
       await _chatsCollection.doc(chatId).update({
         'readStatus.$userId': true,
       });
 
       return DatabaseResult.success();
     } catch (e) {
-      print("Error marking message as read: $e");
       return DatabaseResult.error(e.toString());
     }
   }
 
-  Future<DatabaseResult> updateTypingStatus(String chatId, String userId, bool isTyping) async {
+  Future<DatabaseResult> updateTypingStatus(
+      String chatId, String userId, bool isTyping) async {
     try {
       await _chatsCollection.doc(chatId).update({
         'typingStatus.$userId': isTyping,
       });
       return DatabaseResult.success();
     } catch (e) {
-      print("Error updating typing status: $e");
       return DatabaseResult.error(e.toString());
     }
   }
@@ -537,14 +492,13 @@ class DatabaseService {
     return _chatsCollection.doc(chatId).snapshots();
   }
 
-  Future<void> updateGroupTypingStatus(String groupId, String userId, bool isTyping) async {
+  Future<void> updateGroupTypingStatus(
+      String groupId, String userId, bool isTyping) async {
     try {
       await _groupsCollection.doc(groupId).update({
         'typingStatus.$userId': isTyping,
       });
-    } catch (e) {
-      print("Error updating group typing status: $e");
-    }
+    } catch (e) {}
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getUserChats() {
@@ -556,46 +510,46 @@ class DatabaseService {
 
   Future<void> blockUser(String currentUserId, String blockedUserId) async {
     try {
-      // Add to blocked users collection
-      await _firebaseFirestore.collection('users').doc(currentUserId).collection('blocked_users').doc(blockedUserId).set({
+      await _firebaseFirestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('blocked_users')
+          .doc(blockedUserId)
+          .set({
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // Delete the chat if it exists
       final chatQuery = await _firebaseFirestore
           .collection('chats')
           .where('participants', arrayContains: currentUserId)
           .get();
 
       for (var doc in chatQuery.docs) {
-        final participants = List<String>.from(doc.data()['participants'] ?? []);
+        final participants =
+            List<String>.from(doc.data()['participants'] ?? []);
         if (participants.contains(blockedUserId)) {
           await doc.reference.delete();
           break;
         }
       }
     } catch (e) {
-      print('Error blocking user: $e');
       rethrow;
     }
   }
 
   Future<void> clearChat(String chatId) async {
     try {
-      // Get all messages in the chat
       final messagesQuery = await _firebaseFirestore
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .get();
 
-      // Delete all messages
       final batch = _firebaseFirestore.batch();
       for (var doc in messagesQuery.docs) {
         batch.delete(doc.reference);
       }
 
-      // Update chat metadata
       batch.update(_firebaseFirestore.collection('chats').doc(chatId), {
         'lastMessage': null,
         'lastMessageTime': null,
@@ -604,22 +558,27 @@ class DatabaseService {
 
       await batch.commit();
     } catch (e) {
-      print('Error clearing chat: $e');
       rethrow;
     }
   }
 
   Stream<List<Map<String, dynamic>>> searchInChat(String chatId, String query) {
+    if (query.isEmpty) {
+      return Stream.value([]);
+    }
+
     return _firebaseFirestore
         .collection('chats')
         .doc(chatId)
         .collection('messages')
-        .where('message', isGreaterThanOrEqualTo: query)
-        .where('message', isLessThanOrEqualTo: query + '\uf8ff')
-        .orderBy('message')
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => doc.data()).where((data) {
+        final message = (data['message'] as String).toLowerCase();
+        return message.contains(query.toLowerCase());
+      }).toList();
+    });
   }
 }
 

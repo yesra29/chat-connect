@@ -14,32 +14,28 @@ class AlertService {
   AlertService() {
     _navigationService = _getIt.get<NavigationService>();
   }
-    void showToast({
-      required String text,
-      IconData icon = Icons.info,
-    }) {
-      try {
-        DelightToastBar(
-            autoDismiss: true,
-            position: DelightSnackbarPosition.top,
-            builder: (context) {
-              return ToastCard(
-                  leading: Icon(
-                    icon,
-                    size: 28,
-                  ),
-                  title: Text(
-                    text,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 14),
-                  ));
-            }).show(_navigationService.navigatorKey!.currentContext!);
-      } catch (e) {
-        print(e);
-      }
-    }
+  void showToast({
+    required String text,
+    IconData icon = Icons.info,
+  }) {
+    try {
+      DelightToastBar(
+          autoDismiss: true,
+          position: DelightSnackbarPosition.top,
+          builder: (context) {
+            return ToastCard(
+                leading: Icon(
+                  icon,
+                  size: 28,
+                ),
+                title: Text(
+                  text,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 14),
+                ));
+          }).show(_navigationService.navigatorKey!.currentContext!);
+    } catch (e) {}
   }
-
-class DelightToastPosition {
 }
 
+class DelightToastPosition {}

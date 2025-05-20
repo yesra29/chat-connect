@@ -35,7 +35,7 @@ class Group {
       groupImageUrl: json['groupImageUrl'] as String?,
       createdAt: (json['createdAt'] as Timestamp).toDate(),
       lastMessage: json['lastMessage'] as String?,
-      lastMessageTime: json['lastMessageTime'] != null 
+      lastMessageTime: json['lastMessageTime'] != null
           ? (json['lastMessageTime'] as Timestamp).toDate()
           : null,
       readStatus: Map<String, bool>.from(json['readStatus'] ?? {}),
@@ -52,9 +52,8 @@ class Group {
       'groupImageUrl': groupImageUrl,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastMessage': lastMessage,
-      'lastMessageTime': lastMessageTime != null 
-          ? Timestamp.fromDate(lastMessageTime!)
-          : null,
+      'lastMessageTime':
+          lastMessageTime != null ? Timestamp.fromDate(lastMessageTime!) : null,
       'readStatus': readStatus,
     };
   }
@@ -62,4 +61,4 @@ class Group {
   bool isAdmin(String userId) => adminId == userId;
   bool isParticipant(String userId) => participants.contains(userId);
   bool isReadBy(String userId) => readStatus[userId] ?? false;
-} 
+}

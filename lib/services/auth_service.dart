@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
-
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   User? _user;
@@ -14,7 +13,7 @@ class AuthService {
   Future<AuthResult> login(String email, String password) async {
     try {
       await _firebaseAuth.setPersistence(Persistence.LOCAL);
-      
+
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
           email: email, password: password);
       if (credential.user != null) {
@@ -32,7 +31,7 @@ class AuthService {
   Future<AuthResult> signUp(String email, String password) async {
     try {
       await _firebaseAuth.setPersistence(Persistence.LOCAL);
-      
+
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
           email: email, password: password);
       if (credential.user != null) {

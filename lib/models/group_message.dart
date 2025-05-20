@@ -42,4 +42,4 @@ class Message {
   bool isReadBy(String userId) {
     return readStatus[userId] ?? false;
   }
-} 
+}
