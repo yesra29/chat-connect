@@ -21,7 +21,8 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   final GetIt _getIt = GetIt.instance;
   late AuthService _authService;
   late NavigationService _navigationService;
@@ -49,35 +50,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search',
+          hintText: 'Search users...',
           prefixIcon: const Icon(Icons.search, color: Color(0XFFA65B17)),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: Color(0XFFA65B17)),
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      _searchQuery = '';
-                    });
-                  },
-                )
-              : null,
+          filled: true,
+          fillColor: Colors.grey[200],
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(24),
             borderSide: BorderSide.none,
           ),
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.9),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
         ),
         onChanged: (value) {
           setState(() {
-            _searchQuery = value.toLowerCase();
+            _searchQuery = value;
           });
         },
       ),
@@ -85,171 +75,154 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildChatList() {
-    return SafeArea(
-      child: Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15.0),
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _databaseService.getUserChats(),
-                builder: (context, chatSnapshot) {
-                  if (chatSnapshot.hasError) {
-                    print("Error in chat list: ${chatSnapshot.error}");
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                          const SizedBox(height: 16),
-                          Text(
-                            "Unable to load chats: ${chatSnapshot.error}",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _databaseService.getUserChats(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final chatDocs = snapshot.data?.docs ?? [];
+        if (chatDocs.isEmpty) {
+          return const Center(child: Text('No chats yet'));
+        }
+
+        return ListView.builder(
+          itemCount: chatDocs.length,
+          itemBuilder: (context, index) {
+            final chatData = chatDocs[index].data();
+            final participants =
+                List<String>.from(chatData['participants'] ?? []);
+            final otherUserId = participants.firstWhere(
+              (id) => id != _authService.user!.uid,
+              orElse: () => '',
+            );
+
+            if (otherUserId.isEmpty) return const SizedBox.shrink();
+
+            return FutureBuilder<UserProfile?>(
+              future: _databaseService.getUserProfile(otherUserId),
+              builder: (context, userSnapshot) {
+                if (!userSnapshot.hasData) {
+                  return const SizedBox.shrink();
+                }
+
+                final user = userSnapshot.data!;
+
+                if (_searchQuery.isNotEmpty &&
+                    !user.name
+                        .toLowerCase()
+                        .contains(_searchQuery.toLowerCase())) {
+                  return const SizedBox.shrink();
+                }
+
+                final chat = chat_model.Chat.fromJson(chatData);
+                final isRead = chat.readStatus[_authService.user!.uid] ?? false;
+                final lastMessageTime = chat.lastMessageTime;
+                final lastSenderId = chatData['lastSenderId'] as String?;
+                final isLastMessageMine =
+                    lastSenderId == _authService.user!.uid;
+
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0XFF174EA6),
+                    child: Text(
+                      getInitials(user.name),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  title: Text(user.name),
+                  subtitle: Text(
+                    chat.lastMessage ?? 'No messages yet',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (lastMessageTime != null)
+                        Text(
+                          formatTimestamp(lastMessageTime),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      if (!isRead && !isLastMessageMine)
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
                           ),
-                        ],
+                          child: const Text(
+                            '1',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onTap: () async {
+                    final chatId = await _databaseService.getChatId(
+                      _authService.user!.uid,
+                      otherUserId,
+                    );
+
+                    if (!mounted) return;
+
+                    if (chatId == null || chatId.isEmpty) {
+                      _alertService.showToast(
+                        text: "Failed to create chat",
+                        icon: Icons.error,
+                      );
+                      return;
+                    }
+
+                    final result = await _databaseService.createChat(
+                      _authService.user!.uid,
+                      otherUserId,
+                    );
+
+                    if (!result.isSuccess) {
+                      _alertService.showToast(
+                        text: "Failed to create chat: ${result.error}",
+                        icon: Icons.error,
+                      );
+                      return;
+                    }
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatPage(
+                          chatId: chatId,
+                          currentUserId: _authService.user!.uid,
+                          otherUserId: otherUserId,
+                        ),
                       ),
                     );
-                  }
-
-                  if (chatSnapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-
-                  if (!chatSnapshot.hasData || chatSnapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            "No chats yet",
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            "Start a new conversation",
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  final chatDocs = chatSnapshot.data!.docs;
-                  return ListView.builder(
-                    itemCount: chatDocs.length,
-                    itemBuilder: (context, index) {
-                      final chatData = chatDocs[index].data();
-                      final participants = List<String>.from(chatData['participants'] ?? []);
-                      final otherUserId = participants.firstWhere(
-                        (id) => id != _authService.user!.uid,
-                        orElse: () => '',
-                      );
-
-                      if (otherUserId.isEmpty) return const SizedBox.shrink();
-
-                      return FutureBuilder<UserProfile?>(
-                        future: _databaseService.getUserProfile(otherUserId),
-                        builder: (context, userSnapshot) {
-                          if (!userSnapshot.hasData) {
-                            return const SizedBox.shrink();
-                          }
-
-                          final user = userSnapshot.data!;
-                          final chat = chat_model.Chat.fromJson(chatData);
-                          final isRead = chat.readStatus[_authService.user!.uid] ?? false;
-                          final lastMessageTime = chat.lastMessageTime;
-                          final lastSenderId = chatData['lastSenderId'] as String?;
-                          final isLastMessageMine = lastSenderId == _authService.user!.uid;
-
-                          return Column(
-                            children: [
-                              ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage: NetworkImage(
-                                    user.pfpURL ?? 
-                                    'https://ui-avatars.com/api/?name=${user.name}&background=random',
-                                  ),
-                                ),
-                                title: Row(
-                                  children: [
-                                    Text(user.name ?? 'Unknown User'),
-                                    if (!isRead && !isLastMessageMine) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: Colors.blue,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                subtitle: Row(
-                                  children: [
-                                    if (isLastMessageMine) ...[
-                                      const Icon(
-                                        Icons.done_all,
-                                        size: 16,
-                                        color: Colors.blue,
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
-                                    Expanded(
-                                      child: Text(
-                                        chat.lastMessage ?? 'No messages yet',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                trailing: lastMessageTime != null
-                                    ? Text(
-                                        formatTimestamp(lastMessageTime),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
-                                        ),
-                                      )
-                                    : null,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ChatPage(
-                                        chatId: chatDocs[index].id,
-                                        currentUserId: _authService.user!.uid,
-                                        otherUserId: otherUserId,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              Divider(
-                                height: 0,
-                                thickness: 0.5,
-                                color: Colors.grey.withOpacity(0.2),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
     );
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return 'U';
+    final parts = name.split(' ');
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
   }
 
   Widget _buildGroupList() {
@@ -264,7 +237,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const Icon(Icons.error_outline,
+                        color: Colors.red, size: 48),
                     const SizedBox(height: 16),
                     Text(
                       "Unable to load groups: ${snapshot.error}",
@@ -282,7 +256,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               );
             }
 
-            if (!snapshot.hasData || snapshot.data == null || snapshot.data!.docs.isEmpty) {
+            if (!snapshot.hasData ||
+                snapshot.data == null ||
+                snapshot.data!.docs.isEmpty) {
               return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -307,7 +283,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               itemBuilder: (context, index) {
                 final group = groups[index];
                 final isRead = group.isReadBy(_authService.user!.uid);
-                
+
                 return Column(
                   children: [
                     ListTile(
@@ -324,7 +300,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Text(group.name),
                           if (!isRead) ...[
                             const SizedBox(width: 8),
-                            const Icon(Icons.circle, size: 8, color: Colors.blue),
+                            const Icon(Icons.circle,
+                                size: 8, color: Colors.blue),
                           ],
                         ],
                       ),
@@ -380,21 +357,227 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: CustomAppBar(
-          title: 'SmiloChat',
-          showBackButton: false,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search, color: Colors.white),
-              onPressed: () {
-                // Add search functionality
-              },
+        appBar: AppBar(
+          title: const Text(
+            'SmiloChat',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-            IconButton(
+          ),
+          centerTitle: true,
+          backgroundColor: const Color(0XFF174EA6),
+          actions: [
+            PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: Colors.white),
-              onPressed: () {
-                // Add more options menu
+              position: PopupMenuPosition.under,
+              onCanceled: () {
+                // Unfocus to prevent keyboard from showing
+                FocusScope.of(context).unfocus();
               },
+              onSelected: (value) {
+                switch (value) {
+                  case 'new_chat':
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('New Chat'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              decoration: const InputDecoration(
+                                hintText: 'Type a name or number',
+                                prefixIcon: Icon(Icons.search),
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                // TODO: Implement real-time search
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Contacts on ChatWave',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            StreamBuilder<List<UserProfile>>(
+                              stream: _databaseService.getUserProfiles(),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+
+                                final users = snapshot.data!;
+                                return SizedBox(
+                                  height: 300,
+                                  child: ListView.builder(
+                                    itemCount: users.length,
+                                    itemBuilder: (context, index) {
+                                      final user = users[index];
+                                      return ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundImage: user.pfpURL != null
+                                              ? NetworkImage(user.pfpURL!)
+                                              : null,
+                                          child: user.pfpURL == null
+                                              ? Text(
+                                                  user.name?[0].toUpperCase() ??
+                                                      'U')
+                                              : null,
+                                        ),
+                                        title:
+                                            Text(user.name ?? 'Unknown User'),
+                                        subtitle: Text(user.email ?? ''),
+                                        onTap: () async {
+                                          final chatId =
+                                              await _databaseService.getChatId(
+                                            _authService.user!.uid,
+                                            user.uid,
+                                          );
+                                          if (!mounted) return;
+
+                                          // Add validation for chat ID
+                                          if (chatId == null ||
+                                              chatId.isEmpty) {
+                                            _alertService.showToast(
+                                              text: "Failed to create chat",
+                                              icon: Icons.error,
+                                            );
+                                            return;
+                                          }
+
+                                          // Create chat if it doesn't exist
+                                          final result =
+                                              await _databaseService.createChat(
+                                            _authService.user!.uid,
+                                            user.uid,
+                                          );
+
+                                          if (!result.isSuccess) {
+                                            _alertService.showToast(
+                                              text:
+                                                  "Failed to create chat: ${result.error}",
+                                              icon: Icons.error,
+                                            );
+                                            return;
+                                          }
+
+                                          Navigator.pop(context);
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => ChatPage(
+                                                chatId: chatId,
+                                                currentUserId:
+                                                    _authService.user!.uid,
+                                                otherUserId: user.uid,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      ),
+                    );
+                    break;
+                  case 'new_group':
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CreateGroupPage(),
+                      ),
+                    );
+                    break;
+                  case 'read_all':
+                    // TODO: Implement read all functionality
+                    _alertService.showToast(
+                      text: "Marking all messages as read",
+                      icon: Icons.check,
+                    );
+                    break;
+                  case 'settings':
+                    // TODO: Navigate to settings page
+                    _alertService.showToast(
+                      text: "Settings page coming soon",
+                      icon: Icons.settings,
+                    );
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                PopupMenuItem<String>(
+                  value: 'new_chat',
+                  child: const Row(
+                    children: [
+                      Icon(Icons.chat, color: Color(0XFFA65B17)),
+                      SizedBox(width: 8),
+                      Text(
+                        'New Chat',
+                        style: TextStyle(color: Color(0XFFA65B17)),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'new_group',
+                  child: Row(
+                    children: [
+                      Icon(Icons.group_add, color: Color(0XFFA65B17)),
+                      SizedBox(width: 8),
+                      Text(
+                        'New Group',
+                        style: TextStyle(color: Color(0XFFA65B17)),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'read_all',
+                  child: Row(
+                    children: [
+                      Icon(Icons.done_all, color: Color(0XFFA65B17)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Read All',
+                        style: TextStyle(color: Color(0XFFA65B17)),
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'settings',
+                  child: Row(
+                    children: [
+                      Icon(Icons.settings, color: Color(0XFFA65B17)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Settings',
+                        style: TextStyle(color: Color(0XFFA65B17)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -427,114 +610,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ),
           ],
         ),
-        floatingActionButton: _tabController.index == 0
-            ? FloatingActionButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('New Chat'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextField(
-                            decoration: const InputDecoration(
-                              hintText: 'Type a name or number',
-                              prefixIcon: Icon(Icons.search),
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              // TODO: Implement real-time search
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Contacts on ChatWave',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          StreamBuilder<List<UserProfile>>(
-                            stream: _databaseService.getUserProfiles(),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) {
-                                return const Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              }
-
-                              final users = snapshot.data!;
-                              return SizedBox(
-                                height: 300,
-                                child: ListView.builder(
-                                  itemCount: users.length,
-                                  itemBuilder: (context, index) {
-                                    final user = users[index];
-                                    return ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundImage: user.pfpURL != null
-                                            ? NetworkImage(user.pfpURL!)
-                                            : null,
-                                        child: user.pfpURL == null
-                                            ? Text(user.name?[0].toUpperCase() ?? 'U')
-                                            : null,
-                                      ),
-                                      title: Text(user.name ?? 'Unknown User'),
-                                      subtitle: Text(user.email ?? ''),
-                                      onTap: () async {
-                                        final chatId = await _databaseService.getChatId(
-                                          _authService.user!.uid,
-                                          user.uid,
-                                        );
-                                        if (!mounted) return;
-                                        Navigator.pop(context);
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => ChatPage(
-                                              chatId: chatId,
-                                              currentUserId: _authService.user!.uid,
-                                              otherUserId: user.uid,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                backgroundColor: const Color(0XFFA65B17),
-                child: const Icon(Icons.chat, color: Colors.white),
-                tooltip: 'New Chat',
-              )
-            : FloatingActionButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CreateGroupPage(),
-                    ),
-                  );
-                },
-                backgroundColor: const Color(0XFFA65B17),
-                child: const Icon(Icons.group_add, color: Colors.white),
-                tooltip: 'Create Group',
-              ),
       ),
     );
   }

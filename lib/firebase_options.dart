@@ -44,39 +44,39 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR-WEB-API-KEY',
-    appId: 'YOUR-WEB-APP-ID',
-    messagingSenderId: 'YOUR-SENDER-ID',
-    projectId: 'YOUR-PROJECT-ID',
-    authDomain: 'YOUR-AUTH-DOMAIN',
-    storageBucket: 'YOUR-STORAGE-BUCKET',
+    apiKey: 'AIzaSyChstndHyV_oqBH305sySNre2sEYMXeAIg',
+    appId: '1:952888872607:web:0403505f945cd244d75caa',
+    messagingSenderId: '952888872607',
+    projectId: 'chat-connect-b9f01',
+    authDomain: 'chat-connect-b9f01.firebaseapp.com',
+    storageBucket: 'chat-connect-b9f01.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR-ANDROID-API-KEY',
-    appId: 'YOUR-ANDROID-APP-ID',
-    messagingSenderId: 'YOUR-SENDER-ID',
-    projectId: 'YOUR-PROJECT-ID',
-    storageBucket: 'YOUR-STORAGE-BUCKET',
+    apiKey: 'AIzaSyChstndHyV_oqBH305sySNre2sEYMXeAIg',
+    appId: '1:952888872607:android:0403505f945cd244d75caa',
+    messagingSenderId: '952888872607',
+    projectId: 'chat-connect-b9f01',
+    storageBucket: 'chat-connect-b9f01.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR-IOS-API-KEY',
-    appId: 'YOUR-IOS-APP-ID',
-    messagingSenderId: 'YOUR-SENDER-ID',
-    projectId: 'YOUR-PROJECT-ID',
-    storageBucket: 'YOUR-STORAGE-BUCKET',
-    iosClientId: 'YOUR-IOS-CLIENT-ID',
-    iosBundleId: 'YOUR-IOS-BUNDLE-ID',
+    apiKey: 'AIzaSyChstndHyV_oqBH305sySNre2sEYMXeAIg',
+    appId: '1:952888872607:ios:0403505f945cd244d75caa',
+    messagingSenderId: '952888872607',
+    projectId: 'chat-connect-b9f01',
+    storageBucket: 'chat-connect-b9f01.firebasestorage.app',
+    iosClientId: '952888872607-ios-client-id',
+    iosBundleId: 'com.example.tuneupTask',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'YOUR-MACOS-API-KEY',
-    appId: 'YOUR-MACOS-APP-ID',
-    messagingSenderId: 'YOUR-SENDER-ID',
-    projectId: 'YOUR-PROJECT-ID',
-    storageBucket: 'YOUR-STORAGE-BUCKET',
-    iosClientId: 'YOUR-MACOS-CLIENT-ID',
-    iosBundleId: 'YOUR-MACOS-BUNDLE-ID',
+    apiKey: 'AIzaSyChstndHyV_oqBH305sySNre2sEYMXeAIg',
+    appId: '1:952888872607:macos:0403505f945cd244d75caa',
+    messagingSenderId: '952888872607',
+    projectId: 'chat-connect-b9f01',
+    storageBucket: 'chat-connect-b9f01.firebasestorage.app',
+    iosClientId: '952888872607-macos-client-id',
+    iosBundleId: 'com.example.tuneupTask',
   );
 }

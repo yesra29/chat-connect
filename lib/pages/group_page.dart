@@ -23,7 +23,8 @@ class GroupPage extends StatefulWidget {
 
 class _GroupPageState extends State<GroupPage> {
   final TextEditingController _messageController = TextEditingController();
-  final DatabaseService _databaseService = GetIt.instance.get<DatabaseService>();
+  final DatabaseService _databaseService =
+      GetIt.instance.get<DatabaseService>();
   late Stream<QuerySnapshot<Map<String, dynamic>>> _messagesStream;
   late Stream<DocumentSnapshot<Map<String, dynamic>>> _groupStream;
   Map<String, UserProfile?> _userProfiles = {};
@@ -77,7 +78,6 @@ class _GroupPageState extends State<GroupPage> {
         }
       }
     } catch (e) {
-      print("Error sending message: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error sending message')),
@@ -91,7 +91,8 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   String _formatMessageTime(DateTime time) {
-    final hour = time.hour > 12 ? time.hour - 12 : (time.hour == 0 ? 12 : time.hour);
+    final hour =
+        time.hour > 12 ? time.hour - 12 : (time.hour == 0 ? 12 : time.hour);
     final amPm = time.hour >= 12 ? 'PM' : 'AM';
     return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')} $amPm';
   }
@@ -100,13 +101,9 @@ class _GroupPageState extends State<GroupPage> {
     // Normalize both dates to midnight in local time
     final localDate1 = DateTime(date1.year, date1.month, date1.day);
     final localDate2 = DateTime(date2.year, date2.month, date2.day);
-    
+
     // Debug prints
-    print('Comparing dates:');
-    print('Date 1: $localDate1');
-    print('Date 2: $localDate2');
-    print('Are same day: ${localDate1 == localDate2}');
-    
+
     return localDate1 == localDate2;
   }
 
@@ -117,10 +114,6 @@ class _GroupPageState extends State<GroupPage> {
     final messageDate = DateTime(date.year, date.month, date.day);
 
     // Debug prints
-    print('Current time: $now');
-    print('Today date: $today');
-    print('Message date: $messageDate');
-    print('Is same day: ${isSameDay(messageDate, today)}');
 
     if (isSameDay(messageDate, today)) {
       return 'Today';
@@ -137,7 +130,8 @@ class _GroupPageState extends State<GroupPage> {
     final totalParticipants = _userProfiles.length;
     final readCount = readStatus.values.where((read) => read).length;
     final isDelivered = readCount > 0;
-    final isSeenByAll = readCount == totalParticipants - 1; // -1 to exclude sender
+    final isSeenByAll =
+        readCount == totalParticipants - 1; // -1 to exclude sender
 
     if (!isMe) return const SizedBox.shrink();
 
@@ -145,15 +139,17 @@ class _GroupPageState extends State<GroupPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          isSeenByAll ? Icons.done_all : (isDelivered ? Icons.done_all : Icons.done),
+          isSeenByAll
+              ? Icons.done_all
+              : (isDelivered ? Icons.done_all : Icons.done),
           size: 12,
           color: isSeenByAll ? Colors.blue : Colors.white70,
         ),
         if (isSeenByAll) ...[
           const SizedBox(width: 4),
-          Text(
+          const Text(
             'Seen by all',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
               color: Colors.white70,
             ),
@@ -188,7 +184,8 @@ class _GroupPageState extends State<GroupPage> {
         } else if (typingUsers.length == 2) {
           typingText = '${typingUsers[0]} and ${typingUsers[1]} are typing...';
         } else {
-          typingText = '${typingUsers[0]} and ${typingUsers.length - 1} others are typing...';
+          typingText =
+              '${typingUsers[0]} and ${typingUsers.length - 1} others are typing...';
         }
 
         return Padding(
@@ -216,14 +213,15 @@ class _GroupPageState extends State<GroupPage> {
               final group = Group.fromJson(snapshot.data!.data()!);
               return Text(group.name);
             }
-            return Text('Group Chat');
+            return const Text('Group Chat');
           },
         ),
       ),
       body: Container(
-        decoration: BoxDecoration(
-          image: DecorationImage(image: AssetImage("assets/chat_bg.png"),fit: BoxFit.fitHeight)
-        ),
+        decoration: const BoxDecoration(
+            image: DecorationImage(
+                image: AssetImage("assets/chat_bg.png"),
+                fit: BoxFit.fitHeight)),
         child: Column(
           children: [
             Expanded(
@@ -235,26 +233,34 @@ class _GroupPageState extends State<GroupPage> {
                       stream: _messagesStream,
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
                         }
 
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
                         }
 
                         final messages = snapshot.data?.docs.map((doc) {
-                          final data = doc.data();
-                          return Message(
-                            id: doc.id,
-                            senderId: data['senderId'] as String,
-                            message: data['message'] as String,
-                            timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-                            readStatus: Map<String, bool>.from(data['readStatus'] ?? {}),
-                          );
-                        }).toList() ?? [];
+                              final data = doc.data();
+                              return Message(
+                                id: doc.id,
+                                senderId: data['senderId'] as String,
+                                message: data['message'] as String,
+                                timestamp: (data['timestamp'] as Timestamp?)
+                                        ?.toDate() ??
+                                    DateTime.now(),
+                                readStatus: Map<String, bool>.from(
+                                    data['readStatus'] ?? {}),
+                              );
+                            }).toList() ??
+                            [];
 
                         // Sort messages by date in descending order
-                        messages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+                        messages
+                            .sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
                         // Group messages by date
                         Map<DateTime, List<Message>> groupedMessages = {};
@@ -264,7 +270,7 @@ class _GroupPageState extends State<GroupPage> {
                             message.timestamp.month,
                             message.timestamp.day,
                           );
-                          
+
                           if (!groupedMessages.containsKey(messageDay)) {
                             groupedMessages[messageDay] = [];
                           }
@@ -279,14 +285,16 @@ class _GroupPageState extends State<GroupPage> {
                         List<Widget> messageWidgets = [];
                         for (var date in sortedDates) {
                           final messages = groupedMessages[date]!;
-                          
+
                           // Add date separator
                           messageWidgets.add(
                             Center(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8.0),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.grey.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(12),
@@ -306,19 +314,22 @@ class _GroupPageState extends State<GroupPage> {
 
                           // Add messages for this date
                           for (var message in messages) {
-                            final isMe = message.senderId == widget.currentUserId;
+                            final isMe =
+                                message.senderId == widget.currentUserId;
                             final messageDate = message.timestamp;
 
                             // Load user profile if not already loaded
                             _loadUserProfile(message.senderId);
 
                             // Mark message as read when it becomes visible
-                            if (!isMe && !message.isReadBy(widget.currentUserId)) {
+                            if (!isMe &&
+                                !message.isReadBy(widget.currentUserId)) {
                               _markMessageAsRead(message.id);
                             }
 
                             final userProfile = _userProfiles[message.senderId];
-                            final userName = userProfile?.name ?? 'Unknown User';
+                            final userName =
+                                userProfile?.name ?? 'Unknown User';
 
                             messageWidgets.add(
                               Padding(
@@ -334,6 +345,7 @@ class _GroupPageState extends State<GroupPage> {
                                     if (!isMe) ...[
                                       CircleAvatar(
                                         backgroundColor: Colors.blue,
+                                        radius: 16,
                                         child: Text(
                                           _getInitials(userName),
                                           style: const TextStyle(
@@ -341,7 +353,6 @@ class _GroupPageState extends State<GroupPage> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                        radius: 16,
                                       ),
                                       const SizedBox(width: 8),
                                     ],
@@ -349,47 +360,63 @@ class _GroupPageState extends State<GroupPage> {
                                       child: IntrinsicWidth(
                                         child: Container(
                                           constraints: BoxConstraints(
-                                            maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                            maxWidth: MediaQuery.of(context)
+                                                    .size
+                                                    .width *
+                                                0.75,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: isMe ? Colors.blue : Colors.grey[200],
+                                            color: isMe
+                                                ? Colors.blue
+                                                : Colors.grey[200],
                                             borderRadius: BorderRadius.only(
                                               topLeft: const Radius.circular(8),
-                                              topRight: const Radius.circular(8),
-                                              bottomLeft: Radius.circular(isMe ? 8 : 0),
-                                              bottomRight: Radius.circular(isMe ? 0 : 8),
+                                              topRight:
+                                                  const Radius.circular(8),
+                                              bottomLeft:
+                                                  Radius.circular(isMe ? 8 : 0),
+                                              bottomRight:
+                                                  Radius.circular(isMe ? 0 : 8),
                                             ),
                                           ),
                                           child: IntrinsicHeight(
                                             child: Stack(
                                               children: [
                                                 Padding(
-                                                  padding: const EdgeInsets.only(
+                                                  padding:
+                                                      const EdgeInsets.only(
                                                     left: 12,
                                                     right: 12,
                                                     top: 8,
                                                     bottom: 30,
                                                   ),
                                                   child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
                                                     children: [
                                                       if (!isMe) ...[
                                                         Text(
                                                           userName,
-                                                          style: const TextStyle(
+                                                          style:
+                                                              const TextStyle(
                                                             fontSize: 13,
-                                                            fontWeight: FontWeight.bold,
-                                                            color: Colors.black87,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color:
+                                                                Colors.black87,
                                                           ),
                                                         ),
-                                                        const SizedBox(height: 4),
+                                                        const SizedBox(
+                                                            height: 4),
                                                       ],
                                                       Text(
                                                         message.message,
-                                                        style: TextStyle(
+                                                        style: const TextStyle(
                                                           color: Colors.white,
                                                           fontSize: 16,
-                                                          fontWeight: FontWeight.normal,
+                                                          fontWeight:
+                                                              FontWeight.normal,
                                                         ),
                                                       ),
                                                     ],
@@ -399,18 +426,23 @@ class _GroupPageState extends State<GroupPage> {
                                                   right: 8,
                                                   bottom: 8,
                                                   child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: [
                                                       Text(
-                                                        _formatMessageTime(message.timestamp),
+                                                        _formatMessageTime(
+                                                            message.timestamp),
                                                         style: TextStyle(
                                                           fontSize: 11,
-                                                          color: Colors.grey[900],
-                                                          fontWeight: FontWeight.bold,
+                                                          color:
+                                                              Colors.grey[900],
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                         ),
                                                       ),
                                                       const SizedBox(width: 4),
-                                                      _buildMessageStatus(message),
+                                                      _buildMessageStatus(
+                                                          message),
                                                     ],
                                                   ),
                                                 ),
@@ -424,6 +456,7 @@ class _GroupPageState extends State<GroupPage> {
                                       const SizedBox(width: 8),
                                       CircleAvatar(
                                         backgroundColor: Colors.blue,
+                                        radius: 16,
                                         child: Text(
                                           _getInitials(userName),
                                           style: const TextStyle(
@@ -431,7 +464,6 @@ class _GroupPageState extends State<GroupPage> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                        radius: 16,
                                       ),
                                     ],
                                   ],
@@ -444,7 +476,8 @@ class _GroupPageState extends State<GroupPage> {
                         return ListView.builder(
                           reverse: true,
                           itemCount: messageWidgets.length,
-                          itemBuilder: (context, index) => messageWidgets[messageWidgets.length - 1 - index],
+                          itemBuilder: (context, index) =>
+                              messageWidgets[messageWidgets.length - 1 - index],
                         );
                       },
                     ),
@@ -500,4 +533,4 @@ class _GroupPageState extends State<GroupPage> {
     _messageController.dispose();
     super.dispose();
   }
-} 
+}

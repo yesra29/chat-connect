@@ -34,9 +34,8 @@ class Chat {
       'participants': participants,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastMessage': lastMessage,
-      'lastMessageTime': lastMessageTime != null 
-          ? Timestamp.fromDate(lastMessageTime!)
-          : null,
+      'lastMessageTime':
+          lastMessageTime != null ? Timestamp.fromDate(lastMessageTime!) : null,
       'readStatus': readStatus,
     };
   }

@@ -11,11 +11,11 @@ class UserProfile {
     this.email,
   });
 
-  UserProfile.fromJson(Map<String, dynamic> json) 
-    : uid = json['uid']?.toString() ?? '',
-      name = json['name']?.toString() ?? '',
-      pfpURL = json['pfpURL']?.toString(),
-      email = json['email']?.toString();
+  UserProfile.fromJson(Map<String, dynamic> json)
+      : uid = json['uid']?.toString() ?? '',
+        name = json['name']?.toString() ?? '',
+        pfpURL = json['pfpURL']?.toString(),
+        email = json['email']?.toString();
 
   Map<String, dynamic> toJson() {
     return {

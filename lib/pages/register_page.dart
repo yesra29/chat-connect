@@ -141,54 +141,37 @@ class _RegisterPageState extends State<RegisterPage> {
           try {
             if (_registerFormKey.currentState?.validate() ?? false) {
               _registerFormKey.currentState?.save();
-              print("Attempting to register user: $email");
-              
-              AuthResult authResult = await _authService.signUp(email!, password!);
-              print("Auth result: $authResult");
-              
+
+              AuthResult authResult =
+                  await _authService.signUp(email!, password!);
+
               if (authResult == AuthResult.success) {
-                print("Creating user profile for UID: ${_authService.user!.uid}");
-                
-                // Generate a random avatar URL based on the user's name
                 final avatarUrl = getRandomAvatarUrl(name!);
-                print("Generated avatar URL: $avatarUrl");
-                
-                DatabaseResult dbResult = await _databaseService.createUserProfile(
-                  userProfile: UserProfile(
-                    uid: _authService.user!.uid, 
-                    name: name!, 
-                    pfpURL: avatarUrl
-                  )
-                );
-                
-                print("Database result: ${dbResult.isSuccess}");
-                
+
+                DatabaseResult dbResult =
+                    await _databaseService.createUserProfile(
+                        userProfile: UserProfile(
+                            uid: _authService.user!.uid,
+                            name: name!,
+                            pfpURL: avatarUrl));
+
                 if (dbResult.isSuccess) {
                   _alertService.showToast(
-                    text: "User registered successfully!",
-                    icon: Icons.check
-                  );
+                      text: "User registered successfully!", icon: Icons.check);
                   _navigationService.pushReplacementNamed("/login");
                 } else {
                   _alertService.showToast(
-                    text: "Failed to create user profile: ${dbResult.error}",
-                    icon: Icons.error
-                  );
+                      text: "Failed to create user profile: ${dbResult.error}",
+                      icon: Icons.error);
                 }
               } else {
                 String errorMessage = _getErrorMessage(authResult);
-                _alertService.showToast(
-                  text: errorMessage,
-                  icon: Icons.error
-                );
+                _alertService.showToast(text: errorMessage, icon: Icons.error);
               }
             }
           } catch (e) {
-            print("Registration error: $e");
             _alertService.showToast(
-              text: "An unexpected error occurred: $e",
-              icon: Icons.error
-            );
+                text: "An unexpected error occurred: $e", icon: Icons.error);
           } finally {
             setState(() {
               isLoading = false;

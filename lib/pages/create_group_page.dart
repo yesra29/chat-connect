@@ -123,7 +123,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     try {
       final result = await _databaseService.createGroup(
         name: _groupNameController.text,
-        description: '',  // Optional description
+        description: '', // Optional description
         participants: _selectedUsers.map((user) => user.uid).toList(),
       );
 
@@ -265,4 +265,4 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
     _groupNameController.dispose();
     super.dispose();
   }
-} 
+}

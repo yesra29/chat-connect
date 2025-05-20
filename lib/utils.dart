@@ -4,9 +4,10 @@ import 'package:tuneup_task/firebase_options.dart';
 import 'package:tuneup_task/services/alert_service.dart';
 import 'package:tuneup_task/services/auth_service.dart';
 import 'package:tuneup_task/services/database_services.dart';
-import 'package:tuneup_task/services/media_service.dart';
 import 'package:tuneup_task/services/navigation_service.dart';
 import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 Future<void> setupFirebase() async {
   try {
@@ -28,7 +29,6 @@ Future<void> registerServices() async {
     getIt.registerSingleton<NavigationService>(NavigationService());
     getIt.registerSingleton<AlertService>(AlertService());
     getIt.registerSingleton<AuthService>(AuthService());
-    getIt.registerSingleton<MediaService>(MediaService());
     getIt.registerSingleton<DatabaseService>(DatabaseService());
     
     print("All services registered successfully");
@@ -72,20 +72,19 @@ String getRandomAvatarUrl(String name) {
 }
 
 // Utility function to format timestamp
-String formatTimestamp(DateTime timestamp) {
+String formatTimestamp(dynamic timestamp) {
   final now = DateTime.now();
-  final difference = now.difference(timestamp);
+  final date = timestamp is Timestamp ? timestamp.toDate() : timestamp as DateTime;
+  final diff = now.difference(date);
 
-  if (difference.inDays > 7) {
-    return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-  } else if (difference.inDays > 0) {
-    return '${difference.inDays}d ago';
-  } else if (difference.inHours > 0) {
-    return '${difference.inHours}h ago';
-  } else if (difference.inMinutes > 0) {
-    return '${difference.inMinutes}m ago';
+  if (diff.inDays == 0) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  } else if (diff.inDays == 1) {
+    return 'Yesterday';
+  } else if (diff.inDays < 7) {
+    return '${diff.inDays}d ago';
   } else {
-    return 'Just now';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }
 
@@ -112,4 +111,22 @@ String getInitials(String name) {
   }
   
   return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+}
+
+void showErrorSnackBar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.red,
+    ),
+  );
+}
+
+void showSuccessSnackBar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.green,
+    ),
+  );
 }
